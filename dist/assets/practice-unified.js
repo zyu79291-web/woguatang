@@ -439,7 +439,7 @@ function setMode(mode){
  const st=state();if(!question()||st.chunks.length<2||st.mode===mode)return;
  clearTimers();cancelAudio();preferredMode=mode;st.mode=mode;heard.delete(stepKey(st));render();focusInput();
 }
-function restart(){if(!question())return;answerVisible=false;clearTimers();cancelAudio();resetQuestion(question());render();focusInput()}
+function restart({keepLoop=false,replay=false}={}){if(!question())return;answerVisible=false;clearTimers();cancelAudio({keepLoop});resetQuestion(question());render();focusInput();if(replay)void playCurrent()}
 // Opening the previous/next question is like choosing it in the list: its whole sentence plays once.
 async function nextQuestion(delta=1){
  const rows=PTE.visible(),i=rows.findIndex(q=>q.questionKey===question()?.questionKey),next=rows[i+delta];
@@ -547,6 +547,7 @@ $('loopAudio').addEventListener('click',()=>{
 // Answers are revealed together; the independent Chinese hint switch is no longer used.
 $('cueToggle').hidden=true;document.querySelector('.cue-line').classList.remove('cue-off');
 $('previousQuestion').addEventListener('click',()=>nextQuestion(-1));$('nextQuestion').addEventListener('click',()=>nextQuestion(1));
+$('clearRedo').addEventListener('click',()=>restart({keepLoop:true,replay:true}));
 $('again').addEventListener('click',restart);$('restartDone').addEventListener('click',restart);
 $('resultStats').addEventListener('click',e=>{if(e.target.closest('[data-book]'))PTE.book.open()});
 PTE.typingSounds($('drillInput'));
