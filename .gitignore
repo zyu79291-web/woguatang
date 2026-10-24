@@ -1,0 +1,13 @@
+runtime/
+exports/
+__pycache__/
+*.py[cod]
+.DS_Store
+.env
+.env.*
+!.env.example
+*.log
+.openai/
+*进度*.json
+*备份*.json
+install-info.json
