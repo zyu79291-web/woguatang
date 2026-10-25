@@ -14,13 +14,13 @@ try{resumedSession=JSON.parse(localStorage.getItem(SESSION_KEY)||'{}');for(const
 function saveProgress(){
  try{
   const items={};for(const [key,st] of progress){const q=PTE.findQuestion(key);if(!q)continue;const elapsed={};for(const mode of ['whole','chunks'])if(st.started?.[mode])elapsed[mode]=Math.max(0,(st.ended?.[mode]||Date.now())-st.started[mode]);items[key]={sentence:q.sentence,st,elapsed}}
-  localStorage.setItem(SESSION_KEY,JSON.stringify({v:1,active:PTE.active?.questionKey||resumedSession.active,items},(key,value)=>value instanceof Set?[...value]:value));
+  localStorage.setItem(SESSION_KEY,JSON.stringify({v:1,punishmentEnabled,active:PTE.active?.questionKey||resumedSession.active,items},(key,value)=>value instanceof Set?[...value]:value));
  }catch{}
 }
 PTE.flushProgress=saveProgress;window.addEventListener('pagehide',saveProgress);
 const heard=new Set();      // questionKey:mode:step already played by clicking into the input
 let preferredMode='whole',sound=true,autoListen=true,advanceTimer=0,checkTimer=0,cheerTimer=0,composing=false;
-let answerVisible=false,loopEnabled=false;
+let answerVisible=false,loopEnabled=false,punishmentEnabled=resumedSession.punishmentEnabled===true;
 let streak=0;               // consecutive phrases passed without the answer and with at most one miss
 
 // ---------- State ----------
@@ -69,11 +69,12 @@ function fixInput(f){
  if(i===f.at){input.value=parts[0];toEnd();return}
  openSlot(i,parts.at(-1)?{}:{select:true});
 }
-function resetQuestion(q){
+function resetQuestion(q,{keepPunishment=false}={}){
+ const previous=progress.get(q.questionKey),saved=keepPunishment&&previous?.punishment&&!previous.whole.passed?previous.punishment:null;
  const mode=progress.get(q.questionKey)?.mode;
  progress.delete(q.questionKey);
  for(const key of heard)if(key.startsWith(q.questionKey+':'))heard.delete(key);
- const st=stateOf(q);if(mode&&st.chunks.length>1)st.mode=mode;return st;
+ const st=stateOf(q);if(saved){st.punishment={...saved,awaiting:false};st.started=previous.started}if(mode&&st.chunks.length>1)st.mode=mode;return st;
 }
 function clearTimers(){clearTimeout(advanceTimer);clearTimeout(checkTimer);hideCheer()}
 // Rating shown after each phrase and for the whole question.
@@ -328,6 +329,46 @@ function drawWords(){
  if(current>=html.length)html.push(slot('','',true,2));
  words.innerHTML=html.join('');
 }
+// Punishment rounds are independent full dictations; correcting or seeing an answer is practice only.
+const punishment=()=>state().punishment||=( {streak:0,penalty:0,misses:0,awaiting:false,blocked:false} );
+const punishmentTarget=p=>2+p.penalty;
+function renderPunishment(){
+ const p=punishment(),on=punishmentEnabled;
+ $('punishmentToggle').textContent=on?'惩罚模式：开':'惩罚模式：关';
+ $('punishmentToggle').setAttribute('aria-pressed',String(on));
+ $('punishmentProgress').hidden=!on;
+ $('punishmentProgress').textContent=finished()?'本题已通关':`连续全对 ${p.streak} / ${punishmentTarget(p)} · 惩罚 +${p.penalty}`;
+ $('punishmentHelp').hidden=!on;
+ $('punishmentRetry').hidden=!on||!p.awaiting||finished();
+ for(const id of ['nextQuestion','next','nextDone']){
+  $(id).disabled=on&&p.blocked;
+  $(id).title=on&&p.blocked?'先把本题改对，或关闭惩罚模式':'';
+ }
+}
+function nextPunishmentAttempt(){
+ if(!punishmentEnabled||!question())return;
+ const p=punishment();p.awaiting=false;state().whole=blank();answerVisible=false;
+ clearTimers();cancelAudio();render();focusInput();void playCurrent();
+}
+function checkPunishment(fromEnter){
+ const it=item(),p=punishment(),value=typed(it);
+ if(!fromEnter||p.awaiting||!tokens(value).length)return;
+ if(it.checked&&it.checkedText===value){note('请先修改答案，再按 Enter 检查');return}
+ ACCESS.activity(question().questionId,'answer');
+ if(!exact(value)){
+  const exp=expected(),f={slots:alignSlots(exp,tokens(value))};f.ok=f.slots.map((_,i)=>slotOk(f,i,exp));
+  bookWords(it,exp,f);it.checked=true;it.checkedText=value;it.text=value;it.errors++;
+  p.penalty++;p.misses++;p.streak=0;p.blocked=true;
+  render();focusInput();note(`答错：惩罚 +1，需要重新连续全对 ${punishmentTarget(p)} 遍。改对后再完整听写。`);shake();return;
+ }
+ const clean=!it.errors&&!it.revealed;
+ p.blocked=false;if(clean)p.streak++;else p.streak=0;
+ if(clean&&p.streak>=punishmentTarget(p)){p.penalty=0;p.awaiting=false;pass();return}
+ if(clean)bookWords(it,expected(),null);
+ it.checked=true;it.checkedText=value;it.text=value;p.awaiting=true;
+ render();focusInput();tone('success');
+ note(clean?`本遍全对！再独立听写 ${punishmentTarget(p)-p.streak} 遍即可通关。`:'已改对。本遍不计连对，按 Enter 重新完整听写。');
+}
 function render(){
  const q=question();if(!q)return;
  const st=state(),it=item(st),p=parts(),whole=st.mode==='whole',done=finished(st),split=p.length>1;
@@ -342,7 +383,7 @@ function render(){
  document.querySelector('.cue-line').hidden=!answerVisible;
  const shownText=done?'':it.fix&&!it.passed?it.fix.slots[it.fix.at]:it.text;
  if(!composing&&input.value!==shownText)input.value=shownText;
- input.readOnly=done||it.passed;
+ input.readOnly=done||it.passed||(punishmentEnabled&&punishment().awaiting);
  $('lineInput').classList.toggle('is-checked',it.checked&&!it.passed);
  drawWords();
  $('show').hidden=false;$('show').setAttribute('aria-pressed',String(answerVisible));
@@ -352,12 +393,12 @@ function render(){
  $('doneBar').hidden=!done;
  if(done)renderResult(st);
  note(!done&&!it.passed&&!it.text&&currentSource()&&!heard.has(stepKey(st))?'点一下练习区开始播放':'');
- PTE.viewportChanged?.();saveProgress();
+ renderPunishment();PTE.viewportChanged?.();saveProgress();
 }
 // Settlement card: rating, time, first-try phrases and misses for the mode just finished.
 function renderResult(st){
  const items=st.mode==='whole'?[st.whole]:st.chunks;
- const errors=items.reduce((n,it)=>n+it.errors,0),revealed=items.filter(it=>it.revealed).length,firstTry=items.filter(it=>!it.errors&&!it.revealed).length;
+ const errors=punishmentEnabled?punishment().misses:items.reduce((n,it)=>n+it.errors,0),revealed=items.filter(it=>it.revealed).length,firstTry=items.filter(it=>!it.errors&&!it.revealed).length;
  const title=revealed?'完成':errors===0?'Perfect':errors<=2?'Great':'Good';
  const seconds=Math.max(0,Math.round(((st.ended[st.mode]||Date.now())-(st.started[st.mode]||Date.now()))/1000));
  $('resultTitle').textContent=title+'!';$('resultTitle').dataset.level=title;
@@ -376,7 +417,8 @@ function hideCheer(){clearTimeout(cheerTimer);const el=$('cheer');if(el)el.hidde
 
 // ---------- Flow ----------
 function check(fromEnter){
- const it=item();if(!question()||it.passed||finished())return;
+ if(!question())return;const it=item();if(it.passed||finished())return;
+ if(punishmentEnabled){checkPunishment(fromEnter);return}
  const value=typed(it);
  if(tokens(value).length)ACCESS.activity(question().questionId,'answer');
  if(exact(value)){pass();return}
@@ -440,9 +482,10 @@ function setMode(mode){
  const st=state();if(!question()||st.chunks.length<2||st.mode===mode)return;
  clearTimers();cancelAudio();preferredMode=mode;st.mode=mode;heard.delete(stepKey(st));render();focusInput();
 }
-function restart({replay=false}={}){if(!question())return;answerVisible=false;clearTimers();cancelAudio();resetQuestion(question());render();focusInput();if(replay)void playCurrent()}
+function restart({replay=false}={}){if(!question())return;answerVisible=false;clearTimers();cancelAudio();resetQuestion(question(),{keepPunishment:punishmentEnabled});render();focusInput();if(replay)void playCurrent()}
 // Opening the previous/next question is like choosing it in the list: its whole sentence plays once.
 async function nextQuestion(delta=1){
+ if(punishmentEnabled&&punishment().blocked){note('先把本题改对，或关闭惩罚模式');focusInput();return}
  const rows=PTE.visible(),i=rows.findIndex(q=>q.questionKey===question()?.questionKey),next=rows[i+delta];
  if(i<0&&rows[0]){await PTE.select(rows[0].questionKey,{play:true});focusInput();return}
  if(!next){note(delta>0?'已是当前列表最后一题':'已是当前列表第一题');return}
@@ -458,13 +501,14 @@ PTE.afterListRender=updateCount;
 function toggleAnswer(){if(!question())return;answerVisible=!answerVisible;if(answerVisible)item().revealed=true;render();focusInput()}
 PTE.select=async(key,{fromList=false,fresh=false,play=false,resume=false}={})=>{
  const q=PTE.findQuestion(key);if(!q)return;
+ if(question()&&key!==question().questionKey&&punishmentEnabled&&punishment().blocked){note('先把本题改对，或关闭惩罚模式');focusInput();return}
  const selection=++ACCESS.selected;
  clearTimers();cancelAudio();
  try{if(!await ACCESS.ensureStudy(q)||selection!==ACCESS.selected)return}catch(e){note(e.message);return}
 
  clearTimers();cancelAudio();
  PTE.active=q;answerVisible=false;
- for(const it of [...stateOf(q).chunks,stateOf(q).whole])it.revealed=false;
+ if(!punishmentEnabled)for(const it of [...stateOf(q).chunks,stateOf(q).whole])it.revealed=false;
  if($('restore').hidden)dock.hidden=false;
  if(fresh||(!resume&&finished(stateOf(q))))resetQuestion(q);   // a completed question starts over when chosen again
  // Each time a question is opened, the first click into the line plays the current step again, even if it was heard before.
@@ -502,14 +546,14 @@ function handleInput(e){
  heard.add(stepKey(st));
  drawWords();
  clearTimeout(checkTimer);
- if(!composing&&exact(it.text))checkTimer=setTimeout(()=>check(false),220);
+ if(!punishmentEnabled&&!composing&&exact(it.text))checkTimer=setTimeout(()=>check(false),220);
 }
 input.addEventListener('keydown',e=>{
  keySound(e);
  if(e.isComposing||e.keyCode===229)return;
  // Ctrl/Cmd+Enter is the backup answer key (handled below), not a check.
  if(e.key==='Enter'&&(e.ctrlKey||e.metaKey))return;
- if(e.key==='Enter'){e.preventDefault();clearTimeout(checkTimer);if(finished())nextQuestion();else if(item().passed)advance();else check(true);return}
+ if(e.key==='Enter'){e.preventDefault();clearTimeout(checkTimer);if(punishmentEnabled&&punishment().awaiting&&!finished()){if(!e.repeat)nextPunishmentAttempt();return}if(finished())nextQuestion();else if(item().passed)advance();else check(true);return}
  const f=item().fix,collapsed=input.selectionStart===input.selectionEnd;
  // Correcting: Backspace in an empty word goes back to the previous word still to fix.
  if(f&&!item().passed&&e.key==='Backspace'&&!input.value){const prev=editable(f,f.at,-1);if(prev>=0){e.preventDefault();openSlot(prev)}return}
@@ -548,6 +592,16 @@ function toggleLoop(){
  focusInput();
 }
 $('loopAudio').addEventListener('click',toggleLoop);
+$('punishmentRetry').addEventListener('click',nextPunishmentAttempt);
+$('punishmentToggle').addEventListener('click',()=>{
+ if(!question())return;
+ punishmentEnabled=!punishmentEnabled;clearTimers();cancelAudio();answerVisible=false;
+ // A mode switch begins a new attempt, leaving learned questions and daily records intact.
+ const st=state();st.whole=blank();delete st.ended.whole;
+ if(punishmentEnabled)st.punishment={streak:0,penalty:0,misses:0,awaiting:false,blocked:false};
+ render();focusInput();
+ note(punishmentEnabled?'惩罚模式已开启：连续全对 2 遍通关，每错一次要求 +1。按 Enter 检查。':'已恢复普通听写');
+});
 // Answers are revealed together; the independent Chinese hint switch is no longer used.
 $('cueToggle').hidden=true;document.querySelector('.cue-line').classList.remove('cue-off');
 $('previousQuestion').addEventListener('click',()=>nextQuestion(-1));$('nextQuestion').addEventListener('click',()=>nextQuestion(1));
