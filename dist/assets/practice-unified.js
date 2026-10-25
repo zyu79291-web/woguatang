@@ -125,6 +125,7 @@ const player={seq:0,kind:null,timer:0};
 function updateLoopButton(){
  const button=$('loopAudio');button.textContent=loopEnabled?'暂停循环':'循环播放';
  button.setAttribute('aria-pressed',String(loopEnabled));button.setAttribute('aria-label',loopEnabled?'暂停循环播放':'循环播放当前题');
+ button.title=(loopEnabled?'停止循环播放':'循环播放当前题')+'（Alt+L）';button.setAttribute('aria-keyshortcuts','Alt+L');
 }
 function cancelAudio({keepLoop=false}={}){
  player.seq++;player.kind=null;clearTimeout(player.timer);audio.onended=audio.onerror=null;audio.pause();gate(false);
@@ -439,7 +440,7 @@ function setMode(mode){
  const st=state();if(!question()||st.chunks.length<2||st.mode===mode)return;
  clearTimers();cancelAudio();preferredMode=mode;st.mode=mode;heard.delete(stepKey(st));render();focusInput();
 }
-function restart({keepLoop=false,replay=false}={}){if(!question())return;answerVisible=false;clearTimers();cancelAudio({keepLoop});resetQuestion(question());render();focusInput();if(replay)void playCurrent()}
+function restart({replay=false}={}){if(!question())return;answerVisible=false;clearTimers();cancelAudio();resetQuestion(question());render();focusInput();if(replay)void playCurrent()}
 // Opening the previous/next question is like choosing it in the list: its whole sentence plays once.
 async function nextQuestion(delta=1){
  const rows=PTE.visible(),i=rows.findIndex(q=>q.questionKey===question()?.questionKey),next=rows[i+delta];
@@ -540,14 +541,17 @@ dock.addEventListener('click',e=>{
 
 $('play').addEventListener('click',()=>{void playCurrent();focusInput()});
 $('show').addEventListener('click',toggleAnswer);
-$('loopAudio').addEventListener('click',()=>{
- if(loopEnabled){cancelAudio();return}
- loopEnabled=true;audio.loop=true;updateLoopButton();void playCurrent();
-});
+function toggleLoop(){
+ if(!question()||dockHidden()||$('loopAudio').disabled)return;
+ if(loopEnabled)cancelAudio();
+ else{loopEnabled=true;audio.loop=true;updateLoopButton();void playCurrent()}
+ focusInput();
+}
+$('loopAudio').addEventListener('click',toggleLoop);
 // Answers are revealed together; the independent Chinese hint switch is no longer used.
 $('cueToggle').hidden=true;document.querySelector('.cue-line').classList.remove('cue-off');
 $('previousQuestion').addEventListener('click',()=>nextQuestion(-1));$('nextQuestion').addEventListener('click',()=>nextQuestion(1));
-$('clearRedo').addEventListener('click',()=>restart({keepLoop:true,replay:true}));
+$('clearRedo').addEventListener('click',()=>restart({replay:true}));
 $('again').addEventListener('click',restart);$('restartDone').addEventListener('click',restart);
 $('resultStats').addEventListener('click',e=>{if(e.target.closest('[data-book]'))PTE.book.open()});
 PTE.typingSounds($('drillInput'));
@@ -561,6 +565,8 @@ document.querySelector('.more-menu').addEventListener('click',e=>{if(e.target.cl
 // a backup for machines where Ctrl/Cmd+; is taken (Mac spell-check, IME or global hotkeys).
 document.addEventListener('keydown',e=>{
  if(dockHidden()||document.querySelector('dialog[open]'))return;
+ const loopShortcut=e.altKey&&!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&(e.code==='KeyL'||e.key.toLowerCase()==='l');
+ if(loopShortcut){if(e.isComposing)return;e.preventDefault();if(!e.repeat)toggleLoop();return}
  const replay=(e.altKey&&e.key.toLowerCase()==='p')||((e.ctrlKey||e.metaKey)&&(e.key==="'"||e.code==='Quote'));
  const answer=(e.ctrlKey||e.metaKey)&&(e.key===';'||e.code==='Semicolon'||(e.key==='Enter'&&!e.isComposing));
  if(replay){e.preventDefault();void playCurrent()}else if(answer){e.preventDefault();toggleAnswer()}
