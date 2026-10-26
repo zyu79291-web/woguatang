@@ -11,3 +11,7 @@ __pycache__/
 *进度*.json
 *备份*.json
 install-info.json
+
+# Optional local focus build and host registration
+focus/*.app/
+focus/native/launch-host

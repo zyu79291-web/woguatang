@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "窝瓜汤专注开关",
+  "version": "1.0.0",
+  "description": "只保留窝瓜汤、ChatGPT 和 PTE 学姐；随时结束专注。",
+  "minimum_chrome_version": "105",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAt8T/gV+vkZnIqgPMK4yBEjRhQbEkiHEGCQ7Ie7hqtn4C6wwqaYssetiVp42ppmWPFzyN0lPThKBw9BLcjQOrDgCBas+BMn+C333GZobjwfahywUG87XtuI1fj1vxvVY9hCrg3RDwZAYidtME4p8BOlE1GTywDJ/qGX4GrzAQiFN7U9uKtdgftHogWdbtCUc98Lfki+tRhRVyLgYQzGrdnahhNpg349Je2j23+WdsQ6z8pMdcFvIQqylZA8TWlnRcK9exycOo4lDu3NEHvxuNBJYPgz2xnN/BRRoTrDJqoT7//D4IHzmO1u+/+rNrHCykDixvHkohbVWx1aipmlLRzwIDAQAB",
+  "permissions": [
+    "storage",
+    "tabs",
+    "declarativeNetRequest",
+    "nativeMessaging"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "窝瓜汤专注开关"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost:8765/*",
+        "http://127.0.0.1:8765/*"
+      ],
+      "js": [
+        "bridge.js"
+      ],
+      "run_at": "document_start"
+    }
+  ]
+}
