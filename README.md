@@ -26,6 +26,8 @@ Chrome 内只允许窝瓜汤、ChatGPT 和 PTE 学姐，并由本机菜单栏组
 python3 tools/service.py
 ```
 
+Mac 首次安装或修复长期运行时，在系统终端运行 `zsh tools/start_service.sh`，由 macOS 管理登录启动和停止后的重启。启动器会确认端口属于该后台任务，未注册成功时会明确报错，不把临时恢复当作修复完成。
+
 打开 http://localhost:8765/ 。服务只监听本机。离线导出位于 exports/，可通过 http://localhost:8765/offline 打开。
 
 ```sh
