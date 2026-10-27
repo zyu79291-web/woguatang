@@ -371,7 +371,7 @@ function renderPunishment(){
  const reason=p.reason.replace(/^本轮/,'').replace('首次提交未全对','首答未全对');
  progressLabel.textContent=finished()?'已通关':`第 ${p.round} 轮 · ${reason||('已听 '+p.listens+' 遍')}`;
  progressLabel.dataset.state=finished()?'passed':p.reason?'retry':'ready';
- progressLabel.title=p.reason?`${p.reason}，按 Enter 重开一轮`:p.listens?'首次提交全对即可通关':'先听一遍录音，再独立听写';
+ progressLabel.title=p.reason?`${p.reason}；本轮全部写对后，按 Enter 重开一轮`:p.listens?'首次提交全对即可通关':'先听一遍录音，再独立听写';
  $('punishmentHelp').hidden=!on;if(!on)$('punishmentHelp').open=false;
  $('punishmentRetry').hidden=!on||(!p.reason&&!p.awaiting)||finished();
  for(const id of ['nextQuestion','next','nextDone']){
@@ -386,21 +386,21 @@ function nextPunishmentAttempt(){
 function checkPunishment(fromEnter){
  const it=item(),p=punishment(),value=typed(it);
  if(!fromEnter)return;
- // Enter on a disqualified round starts over immediately, even with an empty line.
- if(p.reason||p.awaiting){
-  nextPunishmentAttempt();note('已开始新一轮：只听一遍，独立写对。');return;
+ if(!tokens(value).length){note('先把本轮完整写对，再按 Enter。');return}
+ if(it.checked&&it.checkedText===value&&!exact(value)){
+  note('本轮还没全对，修改后再按 Enter。');return;
  }
- if(!tokens(value).length)return;
  ACCESS.activity(question().questionId,'answer');p.submissions++;
  if(!exact(value)){
   const exp=expected(),f={slots:alignSlots(exp,tokens(value))};f.ok=f.slots.map((_,i)=>slotOk(f,i,exp));
-  bookWords(it,exp,f);p.misses++;invalidatePunishment('本轮首次提交未全对');
-  nextPunishmentAttempt();note('本轮未全对，已开始新一轮。');return;
+  bookWords(it,exp,f);it.checked=true;it.checkedText=value;it.text=value;it.errors++;
+  p.awaiting=false;p.misses++;invalidatePunishment('本轮首次提交未全对');
+  render();focusInput();note('本轮还没全对，继续修改；整句写对后按 Enter 开始新一轮。');return;
  }
- const clean=p.listens===1&&p.submissions===1&&!it.errors&&!it.revealed;
+ const clean=p.listens===1&&p.submissions===1&&!p.reason&&!it.errors&&!it.revealed;
  if(clean){p.blocked=false;p.awaiting=false;pass();return}
  invalidatePunishment(it.revealed?'本轮已看答案':p.listens!==1?'本轮未只听一遍录音':'本轮不是首次提交');
- nextPunishmentAttempt();note('本轮未满足一遍过条件，已开始新一轮。');
+ nextPunishmentAttempt();note('本轮已全部写对，开始新一轮独立听写。');
 }
 
 function render(){
@@ -417,7 +417,7 @@ function render(){
  document.querySelector('.cue-line').hidden=!answerVisible;
  const shownText=done?'':it.fix&&!it.passed?it.fix.slots[it.fix.at]:it.text;
  if(!composing&&input.value!==shownText)input.value=shownText;
- input.readOnly=done||it.passed||(punishmentEnabled&&punishment().awaiting);
+ input.readOnly=done||it.passed;
  $('lineInput').classList.toggle('is-checked',it.checked&&!it.passed);
  drawWords();
  $('show').hidden=false;$('show').setAttribute('aria-pressed',String(answerVisible));
