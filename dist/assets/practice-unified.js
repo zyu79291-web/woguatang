@@ -70,6 +70,18 @@ function fixInput(f){
  if(i===f.at){input.value=parts[0];toEnd();return}
  openSlot(i,parts.at(-1)?{}:{select:true});
 }
+// Both practice modes share the same word-by-word correction path.
+function selectFirstMistake(f){
+ const first=f.ok.indexOf(false);
+ if(first<0)return;
+ focusInput();openSlot(first,{select:true});
+}
+function markCorrections(it,value){
+ const exp=expected(),f=it.fix||{slots:alignSlots(exp,tokens(value)),at:0};
+ f.ok=f.slots.map((_,i)=>slotOk(f,i,exp));f.marked=f.slots.slice();
+ bookWords(it,exp,f);it.fix=f;it.text=typed(it);it.checked=true;it.checkedText=it.text;it.errors++;
+ return f;
+}
 // Lifetime question counts live beside practice status, so resets and weekly bank updates keep them.
 function seedRoundHistory(q,st){
  const saved=PTE.states[q.questionKey]||{};
@@ -99,12 +111,20 @@ function hideAnswerForTyping(){
  $('show').setAttribute('aria-pressed','false');$('show').textContent='答案';
  // The answer was still seen in this round; only its visibility changes.
 }
-function resetQuestion(q,{keepPunishment=false}={}){
- const previous=progress.get(q.questionKey),saved=keepPunishment&&previous?.punishment&&!previous.whole.passed?previous.punishment:null;
+function resetQuestion(q,{keepPunishment=false,sameRound=false}={}){
+ const previous=progress.get(q.questionKey),saved=keepPunishment&&previous?.punishment&&(sameRound||!previous.whole.passed)?previous.punishment:null;
  const mode=progress.get(q.questionKey)?.mode;
  progress.delete(q.questionKey);
  for(const key of heard)if(key.startsWith(q.questionKey+':'))heard.delete(key);
- const st=stateOf(q);if(saved){st.punishment=newPunishmentRound(saved);st.started=previous.started}if(mode&&st.chunks.length>1)st.mode=mode;return st;
+ const st=stateOf(q);
+ if(saved){st.punishment=sameRound?{...saved,awaiting:false}:newPunishmentRound(saved);st.started=previous.started}
+ if(sameRound&&previous){
+  st.roundRecorded=previous.roundRecorded;st.started=previous.started;
+  // Clearing the line is another try within this round, with the same exposure/error history.
+  st.whole.errors=previous.whole.errors;st.whole.revealed=previous.whole.revealed;
+  if(previous.whole.booked)st.whole.booked=new Set(previous.whole.booked);
+ }
+ if(mode&&st.chunks.length>1)st.mode=mode;return st;
 }
 function clearTimers(){clearTimeout(advanceTimer);clearTimeout(checkTimer);hideCheer()}
 // Rating shown after each phrase and for the whole question.
@@ -421,14 +441,14 @@ function checkPunishment(fromEnter){
  if(!fromEnter)return;
  if(!tokens(value).length){note('先把本轮完整写对，再按 Enter。');return}
  if(it.checked&&it.checkedText===value&&!exact(value)){
-  note('本轮还没全对，修改后再按 Enter。');return;
+  if(it.fix)selectFirstMistake(it.fix);
+  note('直接输入替换选中的错词，空格移到下一个；全对后按 Enter。');return;
  }
  ACCESS.activity(question().questionId,'answer');p.submissions++;
  if(!exact(value)){
-  const exp=expected(),f={slots:alignSlots(exp,tokens(value))};f.ok=f.slots.map((_,i)=>slotOk(f,i,exp));
-  bookWords(it,exp,f);it.checked=true;it.checkedText=value;it.text=value;it.errors++;
+  const f=markCorrections(it,value);
   p.awaiting=false;p.misses++;invalidatePunishment('本轮首次提交未全对');
-  render();focusInput();note('本轮还没全对，继续修改；整句写对后按 Enter 开始新一轮。');return;
+  render();selectFirstMistake(f);note('直接输入替换选中的错词，空格移到下一个；全对后按 Enter 开始新一轮。');return;
  }
  const clean=p.listens===1&&p.submissions===1&&!p.reason&&!it.errors&&!it.revealed;
  if(clean){p.blocked=false;p.awaiting=false;pass();return}
@@ -491,12 +511,10 @@ function check(fromEnter){
  if(tokens(value).length)ACCESS.activity(question().questionId,'answer');
  if(exact(value)){pass();return}
  if(!fromEnter||!tokens(value).length)return;
- // Lock the correct words in place and jump to the first word to fix, selected so typing replaces it.
- const exp=expected(),f=it.fix||{slots:alignSlots(exp,tokens(value)),at:0};
- f.ok=f.slots.map((_,i)=>slotOk(f,i,exp));f.marked=f.slots.slice();
- bookWords(it,exp,f);
- it.fix=f;it.text=typed(it);it.checked=true;it.checkedText=it.text;it.errors++;
- render();focusInput();openSlot(f.ok.indexOf(false),{select:true});shake();
+ // Lock correct words and select the first mistake, ready to be replaced by typing.
+ const f=markCorrections(it,value);
+ render();selectFirstMistake(f);shake();
+
 }
 // The book entry each target word belongs to: the word as written, a hyphenated word kept whole (re-enrollments).
 function bookUnits(text){
@@ -550,7 +568,7 @@ function setMode(mode){
  const st=state();if(!question()||st.chunks.length<2||st.mode===mode)return;
  clearTimers();cancelAudio();preferredMode=mode;st.mode=mode;heard.delete(stepKey(st));render();focusInput();
 }
-function restart({replay=false}={}){if(!question())return;answerVisible=false;clearTimers();cancelAudio();resetQuestion(question(),{keepPunishment:punishmentEnabled});render();focusInput();if(replay)void playCurrent()}
+function restart({replay=false,sameRound=false}={}){if(!question())return;answerVisible=false;clearTimers();cancelAudio();resetQuestion(question(),{keepPunishment:punishmentEnabled,sameRound});render();focusInput();if(replay)void playCurrent()}
 // Opening the previous/next question is like choosing it in the list: its whole sentence plays once.
 async function nextQuestion(delta=1){
  if(punishmentEnabled&&punishment().blocked){note('请重新开始一轮并通关，或关闭一遍过');focusInput();return}
@@ -678,7 +696,7 @@ $('punishmentToggle').addEventListener('click',()=>{
 // Answers are revealed together; the independent Chinese hint switch is no longer used.
 $('cueToggle').hidden=true;document.querySelector('.cue-line').classList.remove('cue-off');
 $('previousQuestion').addEventListener('click',()=>nextQuestion(-1));$('nextQuestion').addEventListener('click',()=>nextQuestion(1));
-$('clearRedo').addEventListener('click',()=>restart({replay:true}));
+$('clearRedo').addEventListener('click',()=>restart({replay:true,sameRound:true}));
 $('again').addEventListener('click',restart);$('restartDone').addEventListener('click',restart);
 $('resultStats').addEventListener('click',e=>{if(e.target.closest('[data-book]'))PTE.book.open()});
 PTE.typingSounds($('drillInput'));
