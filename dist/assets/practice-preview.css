@@ -280,3 +280,28 @@ html.immersive-open{overflow:hidden}
 .bank-sync-notice{border:0;background:transparent;color:#8b96a8;font-size:11px;padding:4px;max-width:180px}.bank-sync-notice:not(:disabled){color:#6554c0;cursor:pointer}.bank-sync-notice[hidden]{display:none!important}.hero-tools{flex-wrap:wrap;justify-content:flex-end}
 
 .progress-backup-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}.progress-backup-actions button,.progress-import{border:1px solid #dce0eb;border-radius:9px;background:#fff;padding:9px 12px;color:#514a76;font:inherit;font-size:13px;cursor:pointer}.progress-import{display:inline-flex;align-items:center}.progress-import input{position:absolute;opacity:0;width:1px;height:1px}.progress-import:focus-within{outline:2px solid #8172c4;outline-offset:2px}
+
+/* One-pass challenge: quiet controls, with rules available on demand. */
+.punishment-controls{display:flex;flex:0 0 auto;align-items:center;gap:10px;flex-wrap:wrap;position:relative;min-height:34px;margin:0 0 16px;padding:0 0 12px;border-bottom:1px solid #ffffff0d}
+.punishment-controls #punishmentToggle{display:inline-flex;align-items:center;gap:8px;flex:none;border:0;border-radius:6px;background:transparent;padding:5px 0;color:#aaa5b6;font-size:12px;font-weight:600;line-height:20px;white-space:nowrap}
+.punishment-controls #punishmentToggle::before{content:"";width:26px;height:15px;border-radius:20px;background:radial-gradient(circle at 7.5px 7.5px,#b2adbf 4.5px,transparent 5px),#34303f;transition:background-color .15s}
+.punishment-controls #punishmentToggle[aria-pressed="true"]{color:#ded6ed}
+.punishment-controls #punishmentToggle[aria-pressed="true"]::before{background:radial-gradient(circle at 18.5px 7.5px,#f4efff 4.5px,transparent 5px),#8270b8}
+.punishment-controls #punishmentToggle:hover{color:#f4efff}
+.punishment-controls #punishmentProgress{flex:1 1 auto;min-width:0;color:#9992a6;font-size:12px;line-height:20px;font-variant-numeric:tabular-nums}
+.punishment-controls #punishmentProgress[data-state="retry"]{color:#c2aa8d}
+.punishment-controls #punishmentProgress[data-state="passed"]{color:#9bc6ae}
+.punishment-controls #punishmentRetry{flex:none;width:auto;align-self:center;display:inline-flex;align-items:center;gap:7px;margin:0;padding:4px 9px;border:1px solid #51445f;border-radius:7px;background:#272130;color:#d3c2e7;font-size:12px;line-height:20px;white-space:nowrap}
+.punishment-controls #punishmentRetry:hover{background:#352a42;border-color:#7b6595}
+.punishment-controls #punishmentRetry span{font-size:13px;color:#a291b6}
+.punishment-help{position:relative;flex:none;margin:0;color:#8f879f;font-size:12px;line-height:1.7}
+.punishment-help summary{display:grid;place-items:center;width:24px;height:28px;list-style:none;cursor:pointer;font-size:11px;font-weight:600;border:1px solid transparent;border-radius:6px}
+.punishment-help summary::-webkit-details-marker{display:none}
+.punishment-help summary:hover,.punishment-help[open] summary{background:#272130;color:#ded6ed}
+.punishment-help summary:focus-visible{outline:2px solid #ac96d7;outline-offset:2px}
+.punishment-rules{position:absolute;z-index:8;right:0;top:34px;width:260px;max-width:calc(100vw - 56px);padding:14px 16px;background:#24202d;border:1px solid #463b54;border-radius:10px;box-shadow:0 10px 28px #0005;color:#bfb5cd;font-size:12px;font-weight:400}
+.punishment-rules strong{display:block;color:#e2d8ef;font-weight:600;margin-bottom:7px}
+.punishment-rules p{color:inherit;margin:0;line-height:1.7}
+.punishment-rules p+p{margin-top:7px}
+.punishment-controls [hidden]{display:none!important}
+@media(max-width:420px){.punishment-controls{gap:7px}.punishment-controls #punishmentProgress{font-size:11px}.punishment-controls #punishmentRetry{padding:4px 7px}.punishment-controls #punishmentRetry span{display:none}}

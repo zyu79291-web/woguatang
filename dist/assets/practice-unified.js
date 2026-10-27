@@ -363,13 +363,16 @@ function invalidatePunishment(reason){
 }
 function renderPunishment(){
  const p=punishment(),on=punishmentEnabled;
- $('punishmentToggle').textContent=on?'一遍过：开':'一遍过：关';
+ $('punishmentToggle').textContent='一遍过';
+ $('punishmentToggle').title=on?'关闭一遍过挑战':'开启一遍过挑战';
  $('punishmentToggle').setAttribute('aria-pressed',String(on));
  $('punishmentProgress').hidden=!on;
- $('punishmentProgress').textContent=finished()?'本题已通关':
-  p.reason?`第 ${p.round} 轮 · ${p.reason}，需重开一轮`:
-  `第 ${p.round} 轮 · 已听 ${p.listens} 遍 · ${p.listens?'首次提交全对即可通关':'请先听一遍录音'}`;
- $('punishmentHelp').hidden=!on;
+ const progressLabel=$('punishmentProgress');
+ const reason=p.reason.replace(/^本轮/,'').replace('首次提交未全对','首答未全对');
+ progressLabel.textContent=finished()?'已通关':`第 ${p.round} 轮 · ${reason||('已听 '+p.listens+' 遍')}`;
+ progressLabel.dataset.state=finished()?'passed':p.reason?'retry':'ready';
+ progressLabel.title=p.reason?`${p.reason}，按 Enter 重开一轮`:p.listens?'首次提交全对即可通关':'先听一遍录音，再独立听写';
+ $('punishmentHelp').hidden=!on;if(!on)$('punishmentHelp').open=false;
  $('punishmentRetry').hidden=!on||(!p.reason&&!p.awaiting)||finished();
  for(const id of ['nextQuestion','next','nextDone']){
   $(id).disabled=on&&p.blocked;
@@ -382,21 +385,22 @@ function nextPunishmentAttempt(){
 }
 function checkPunishment(fromEnter){
  const it=item(),p=punishment(),value=typed(it);
- if(!fromEnter||p.awaiting||!tokens(value).length)return;
- if(it.checked&&it.checkedText===value){note('请先修改答案，或重新开始一轮');return}
+ if(!fromEnter)return;
+ // Enter on a disqualified round starts over immediately, even with an empty line.
+ if(p.reason||p.awaiting){
+  nextPunishmentAttempt();note('已开始新一轮：只听一遍，独立写对。');return;
+ }
+ if(!tokens(value).length)return;
  ACCESS.activity(question().questionId,'answer');p.submissions++;
  if(!exact(value)){
   const exp=expected(),f={slots:alignSlots(exp,tokens(value))};f.ok=f.slots.map((_,i)=>slotOk(f,i,exp));
-  bookWords(it,exp,f);it.checked=true;it.checkedText=value;it.text=value;it.errors++;
-  p.misses++;invalidatePunishment('本轮首次提交未全对');
-  render();focusInput();note('本轮未通关。可以继续改错，或点“重新开始一轮”再听写。');shake();return;
+  bookWords(it,exp,f);p.misses++;invalidatePunishment('本轮首次提交未全对');
+  nextPunishmentAttempt();note('本轮未全对，已开始新一轮。');return;
  }
- const clean=p.listens===1&&p.submissions===1&&!p.reason&&!it.errors&&!it.revealed;
+ const clean=p.listens===1&&p.submissions===1&&!it.errors&&!it.revealed;
  if(clean){p.blocked=false;p.awaiting=false;pass();return}
- if(!p.reason)invalidatePunishment(it.revealed?'本轮已看答案':p.listens!==1?'本轮未只听一遍录音':'本轮不是首次提交');
- it.checked=true;it.checkedText=value;it.text=value;p.awaiting=true;
- render();focusInput();
- note('本次已写对，但本轮不计通关。按 Enter 或点“重新开始一轮”，只听一遍、不看答案、首次提交全对即可过。');
+ invalidatePunishment(it.revealed?'本轮已看答案':p.listens!==1?'本轮未只听一遍录音':'本轮不是首次提交');
+ nextPunishmentAttempt();note('本轮未满足一遍过条件，已开始新一轮。');
 }
 
 function render(){
@@ -583,7 +587,7 @@ input.addEventListener('keydown',e=>{
  if(e.isComposing||e.keyCode===229)return;
  // Ctrl/Cmd+Enter is the backup answer key (handled below), not a check.
  if(e.key==='Enter'&&(e.ctrlKey||e.metaKey))return;
- if(e.key==='Enter'){e.preventDefault();clearTimeout(checkTimer);if(punishmentEnabled&&punishment().awaiting&&!finished()){if(!e.repeat)nextPunishmentAttempt();return}if(finished())nextQuestion();else if(item().passed)advance();else check(true);return}
+ if(e.key==='Enter'){e.preventDefault();clearTimeout(checkTimer);if(punishmentEnabled&&e.repeat)return;if(finished())nextQuestion();else if(item().passed)advance();else check(true);return}
  const f=item().fix,collapsed=input.selectionStart===input.selectionEnd;
  // Correcting: Backspace in an empty word goes back to the previous word still to fix.
  if(f&&!item().passed&&e.key==='Backspace'&&!input.value){const prev=editable(f,f.at,-1);if(prev>=0){e.preventDefault();openSlot(prev)}return}
