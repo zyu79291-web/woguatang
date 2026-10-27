@@ -363,7 +363,7 @@ function invalidatePunishment(reason){
 }
 function renderPunishment(){
  const p=punishment(),on=punishmentEnabled;
- $('punishmentToggle').textContent=on?'惩罚模式：开':'惩罚模式：关';
+ $('punishmentToggle').textContent=on?'一遍过：开':'一遍过：关';
  $('punishmentToggle').setAttribute('aria-pressed',String(on));
  $('punishmentProgress').hidden=!on;
  $('punishmentProgress').textContent=finished()?'本题已通关':
@@ -373,7 +373,7 @@ function renderPunishment(){
  $('punishmentRetry').hidden=!on||(!p.reason&&!p.awaiting)||finished();
  for(const id of ['nextQuestion','next','nextDone']){
   $(id).disabled=on&&p.blocked;
-  $(id).title=on&&p.blocked?'请重新开始一轮并通关，或关闭惩罚模式':'';
+  $(id).title=on&&p.blocked?'请重新开始一轮并通关，或关闭一遍过':'';
  }
 }
 function nextPunishmentAttempt(){
@@ -515,7 +515,7 @@ function setMode(mode){
 function restart({replay=false}={}){if(!question())return;answerVisible=false;clearTimers();cancelAudio();resetQuestion(question(),{keepPunishment:punishmentEnabled});render();focusInput();if(replay)void playCurrent()}
 // Opening the previous/next question is like choosing it in the list: its whole sentence plays once.
 async function nextQuestion(delta=1){
- if(punishmentEnabled&&punishment().blocked){note('请重新开始一轮并通关，或关闭惩罚模式');focusInput();return}
+ if(punishmentEnabled&&punishment().blocked){note('请重新开始一轮并通关，或关闭一遍过');focusInput();return}
  const rows=PTE.visible(),i=rows.findIndex(q=>q.questionKey===question()?.questionKey),next=rows[i+delta];
  if(i<0&&rows[0]){await PTE.select(rows[0].questionKey,{play:true});focusInput();return}
  if(!next){note(delta>0?'已是当前列表最后一题':'已是当前列表第一题');return}
@@ -531,7 +531,7 @@ PTE.afterListRender=updateCount;
 function toggleAnswer(){if(!question())return;answerVisible=!answerVisible;if(answerVisible){item().revealed=true;invalidatePunishment('本轮已看答案')}render();focusInput()}
 PTE.select=async(key,{fromList=false,fresh=false,play=false,resume=false}={})=>{
  const q=PTE.findQuestion(key);if(!q)return;
- if(question()&&key!==question().questionKey&&punishmentEnabled&&punishment().blocked){note('请重新开始一轮并通关，或关闭惩罚模式');focusInput();return}
+ if(question()&&key!==question().questionKey&&punishmentEnabled&&punishment().blocked){note('请重新开始一轮并通关，或关闭一遍过');focusInput();return}
  const selection=++ACCESS.selected;
  clearTimers();cancelAudio();
  try{if(!await ACCESS.ensureStudy(q)||selection!==ACCESS.selected)return}catch(e){note(e.message);return}
@@ -632,7 +632,7 @@ $('punishmentToggle').addEventListener('click',()=>{
  if(punishmentEnabled)st.punishment=newPunishmentRound();
  for(const key of heard)if(key.startsWith(question().questionKey+':'))heard.delete(key);
  render();focusInput();
- note(punishmentEnabled?'惩罚模式已开启：先听一遍，不看答案，首次按 Enter 提交全对即可通关。':'已恢复普通听写');
+ note(punishmentEnabled?'一遍过已开启：先听一遍，不看答案，首次按 Enter 提交全对即可通关。':'已恢复普通听写');
 });
 // Answers are revealed together; the independent Chinese hint switch is no longer used.
 $('cueToggle').hidden=true;document.querySelector('.cue-line').classList.remove('cue-off');
