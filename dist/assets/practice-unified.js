@@ -74,7 +74,7 @@ function resetQuestion(q,{keepPunishment=false}={}){
  const mode=progress.get(q.questionKey)?.mode;
  progress.delete(q.questionKey);
  for(const key of heard)if(key.startsWith(q.questionKey+':'))heard.delete(key);
- const st=stateOf(q);if(saved){st.punishment={...saved,awaiting:false};st.started=previous.started}if(mode&&st.chunks.length>1)st.mode=mode;return st;
+ const st=stateOf(q);if(saved){st.punishment=newPunishmentRound(saved);st.started=previous.started}if(mode&&st.chunks.length>1)st.mode=mode;return st;
 }
 function clearTimers(){clearTimeout(advanceTimer);clearTimeout(checkTimer);hideCheer()}
 // Rating shown after each phrase and for the whole question.
@@ -136,7 +136,17 @@ async function playOnce(src,seq,qid=question()?.questionId){
 
  if(!src)throw Error('缺少本题原版录音');
  if(seq!==player.seq)return;
- return new Promise((resolve,reject)=>{audio.src=src;audio.onended=resolve;audio.onerror=()=>reject(Error('原版录音加载失败'));audio.play().catch(reject)});
+ // Capture this round before playback: a cancelled request must never charge a new round.
+ const q=question(),p=punishmentEnabled&&q?.questionId===qid&&!finished()?punishment():null;
+ return new Promise((resolve,reject)=>{
+  audio.src=src;audio.onended=resolve;audio.onerror=()=>reject(Error('原版录音加载失败'));
+  audio.play().then(()=>{
+   if(!p||seq!==player.seq||!punishmentEnabled||question()!==q||state().punishment!==p)return;
+   p.listens++;
+   if(p.listens>1)invalidatePunishment('本轮已重听');
+   else{renderPunishment();saveProgress()}
+  },reject);
+ });
 
 }
 // Server messages (rate limit with wait time, bank updated) are shown as is; media load failures stay generic.
@@ -186,7 +196,7 @@ PTE.playSentence=async q=>{
 };
 function maybeAutoplay(){
  if(!autoListen||!question()||dockHidden())return;
- const st=state();if(finished(st)||item(st).passed||heard.has(stepKey(st)))return;
+ const st=state();if(finished(st)||item(st).passed||heard.has(stepKey(st))||(punishmentEnabled&&punishment().listens>0))return;
  void playCurrent();
 }
 
@@ -329,46 +339,66 @@ function drawWords(){
  if(current>=html.length)html.push(slot('','',true,2));
  words.innerHTML=html.join('');
 }
-// Punishment rounds are independent full dictations; correcting or seeing an answer is practice only.
-const punishment=()=>state().punishment||=( {streak:0,penalty:0,misses:0,awaiting:false,blocked:false} );
-const punishmentTarget=p=>2+p.penalty;
+// A round passes only on its first submission after one listen, with no answer exposure.
+function newPunishmentRound(previous){
+ return {v:2,round:(previous?.round||0)+1,listens:0,submissions:0,
+  reason:'',misses:previous?.misses||0,awaiting:false,blocked:previous?.blocked||false};
+}
+function punishment(){
+ const st=state();
+ if(st.punishment?.v!==2){
+  const previous=st.punishment;
+  st.punishment=newPunishmentRound(previous);
+  // Old attempts have no reliable listen count. Keep their draft and all completed records.
+  if(!finished(st)&&(previous||st.whole.text||st.whole.revealed||st.whole.errors)){
+   st.punishment.reason='旧规则下的练习';st.punishment.blocked=true;
+  }
+ }
+ return st.punishment;
+}
+function invalidatePunishment(reason){
+ if(!punishmentEnabled||!question()||finished())return;
+ const p=punishment();p.reason||=reason;p.blocked=true;
+ renderPunishment();saveProgress();
+}
 function renderPunishment(){
  const p=punishment(),on=punishmentEnabled;
  $('punishmentToggle').textContent=on?'惩罚模式：开':'惩罚模式：关';
  $('punishmentToggle').setAttribute('aria-pressed',String(on));
  $('punishmentProgress').hidden=!on;
- $('punishmentProgress').textContent=finished()?'本题已通关':`连续全对 ${p.streak} / ${punishmentTarget(p)} · 惩罚 +${p.penalty}`;
+ $('punishmentProgress').textContent=finished()?'本题已通关':
+  p.reason?`第 ${p.round} 轮 · ${p.reason}，需重开一轮`:
+  `第 ${p.round} 轮 · 已听 ${p.listens} 遍 · ${p.listens?'首次提交全对即可通关':'请先听一遍录音'}`;
  $('punishmentHelp').hidden=!on;
- $('punishmentRetry').hidden=!on||!p.awaiting||finished();
+ $('punishmentRetry').hidden=!on||(!p.reason&&!p.awaiting)||finished();
  for(const id of ['nextQuestion','next','nextDone']){
   $(id).disabled=on&&p.blocked;
-  $(id).title=on&&p.blocked?'先把本题改对，或关闭惩罚模式':'';
+  $(id).title=on&&p.blocked?'请重新开始一轮并通关，或关闭惩罚模式':'';
  }
 }
 function nextPunishmentAttempt(){
  if(!punishmentEnabled||!question())return;
- const p=punishment();p.awaiting=false;state().whole=blank();answerVisible=false;
- clearTimers();cancelAudio();render();focusInput();void playCurrent();
+ restart({replay:true});
 }
 function checkPunishment(fromEnter){
  const it=item(),p=punishment(),value=typed(it);
  if(!fromEnter||p.awaiting||!tokens(value).length)return;
- if(it.checked&&it.checkedText===value){note('请先修改答案，再按 Enter 检查');return}
- ACCESS.activity(question().questionId,'answer');
+ if(it.checked&&it.checkedText===value){note('请先修改答案，或重新开始一轮');return}
+ ACCESS.activity(question().questionId,'answer');p.submissions++;
  if(!exact(value)){
   const exp=expected(),f={slots:alignSlots(exp,tokens(value))};f.ok=f.slots.map((_,i)=>slotOk(f,i,exp));
   bookWords(it,exp,f);it.checked=true;it.checkedText=value;it.text=value;it.errors++;
-  p.penalty++;p.misses++;p.streak=0;p.blocked=true;
-  render();focusInput();note(`答错：惩罚 +1，需要重新连续全对 ${punishmentTarget(p)} 遍。改对后再完整听写。`);shake();return;
+  p.misses++;invalidatePunishment('本轮首次提交未全对');
+  render();focusInput();note('本轮未通关。可以继续改错，或点“重新开始一轮”再听写。');shake();return;
  }
- const clean=!it.errors&&!it.revealed;
- p.blocked=false;if(clean)p.streak++;else p.streak=0;
- if(clean&&p.streak>=punishmentTarget(p)){p.penalty=0;p.awaiting=false;pass();return}
- if(clean)bookWords(it,expected(),null);
+ const clean=p.listens===1&&p.submissions===1&&!p.reason&&!it.errors&&!it.revealed;
+ if(clean){p.blocked=false;p.awaiting=false;pass();return}
+ if(!p.reason)invalidatePunishment(it.revealed?'本轮已看答案':p.listens!==1?'本轮未只听一遍录音':'本轮不是首次提交');
  it.checked=true;it.checkedText=value;it.text=value;p.awaiting=true;
- render();focusInput();tone('success');
- note(clean?`本遍全对！再独立听写 ${punishmentTarget(p)-p.streak} 遍即可通关。`:'已改对。本遍不计连对，按 Enter 重新完整听写。');
+ render();focusInput();
+ note('本次已写对，但本轮不计通关。按 Enter 或点“重新开始一轮”，只听一遍、不看答案、首次提交全对即可过。');
 }
+
 function render(){
  const q=question();if(!q)return;
  const st=state(),it=item(st),p=parts(),whole=st.mode==='whole',done=finished(st),split=p.length>1;
@@ -485,7 +515,7 @@ function setMode(mode){
 function restart({replay=false}={}){if(!question())return;answerVisible=false;clearTimers();cancelAudio();resetQuestion(question(),{keepPunishment:punishmentEnabled});render();focusInput();if(replay)void playCurrent()}
 // Opening the previous/next question is like choosing it in the list: its whole sentence plays once.
 async function nextQuestion(delta=1){
- if(punishmentEnabled&&punishment().blocked){note('先把本题改对，或关闭惩罚模式');focusInput();return}
+ if(punishmentEnabled&&punishment().blocked){note('请重新开始一轮并通关，或关闭惩罚模式');focusInput();return}
  const rows=PTE.visible(),i=rows.findIndex(q=>q.questionKey===question()?.questionKey),next=rows[i+delta];
  if(i<0&&rows[0]){await PTE.select(rows[0].questionKey,{play:true});focusInput();return}
  if(!next){note(delta>0?'已是当前列表最后一题':'已是当前列表第一题');return}
@@ -498,10 +528,10 @@ function updateCount(){
  $('dockCount').textContent=i>=0?`${i+1} / ${rows.length}`:'';
 }
 PTE.afterListRender=updateCount;
-function toggleAnswer(){if(!question())return;answerVisible=!answerVisible;if(answerVisible)item().revealed=true;render();focusInput()}
+function toggleAnswer(){if(!question())return;answerVisible=!answerVisible;if(answerVisible){item().revealed=true;invalidatePunishment('本轮已看答案')}render();focusInput()}
 PTE.select=async(key,{fromList=false,fresh=false,play=false,resume=false}={})=>{
  const q=PTE.findQuestion(key);if(!q)return;
- if(question()&&key!==question().questionKey&&punishmentEnabled&&punishment().blocked){note('先把本题改对，或关闭惩罚模式');focusInput();return}
+ if(question()&&key!==question().questionKey&&punishmentEnabled&&punishment().blocked){note('请重新开始一轮并通关，或关闭惩罚模式');focusInput();return}
  const selection=++ACCESS.selected;
  clearTimers();cancelAudio();
  try{if(!await ACCESS.ensureStudy(q)||selection!==ACCESS.selected)return}catch(e){note(e.message);return}
@@ -588,7 +618,7 @@ $('show').addEventListener('click',toggleAnswer);
 function toggleLoop(){
  if(!question()||dockHidden()||$('loopAudio').disabled)return;
  if(loopEnabled)cancelAudio();
- else{loopEnabled=true;audio.loop=true;updateLoopButton();void playCurrent()}
+ else{loopEnabled=true;audio.loop=true;invalidatePunishment('本轮已开循环');updateLoopButton();void playCurrent()}
  focusInput();
 }
 $('loopAudio').addEventListener('click',toggleLoop);
@@ -598,9 +628,11 @@ $('punishmentToggle').addEventListener('click',()=>{
  punishmentEnabled=!punishmentEnabled;clearTimers();cancelAudio();answerVisible=false;
  // A mode switch begins a new attempt, leaving learned questions and daily records intact.
  const st=state();st.whole=blank();delete st.ended.whole;
- if(punishmentEnabled)st.punishment={streak:0,penalty:0,misses:0,awaiting:false,blocked:false};
+ delete st.punishment;
+ if(punishmentEnabled)st.punishment=newPunishmentRound();
+ for(const key of heard)if(key.startsWith(question().questionKey+':'))heard.delete(key);
  render();focusInput();
- note(punishmentEnabled?'惩罚模式已开启：连续全对 2 遍通关，每错一次要求 +1。按 Enter 检查。':'已恢复普通听写');
+ note(punishmentEnabled?'惩罚模式已开启：先听一遍，不看答案，首次按 Enter 提交全对即可通关。':'已恢复普通听写');
 });
 // Answers are revealed together; the independent Chinese hint switch is no longer used.
 $('cueToggle').hidden=true;document.querySelector('.cue-line').classList.remove('cue-off');
