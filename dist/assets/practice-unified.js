@@ -456,13 +456,13 @@ function checkPunishment(fromEnter){
  if(!tokens(value).length){note('先把本轮完整写对，再按 Enter。');return}
  if(it.checked&&it.checkedText===value&&!exact(value)){
   if(it.fix)selectFirstMistake(it.fix);
-  note('直接输入替换选中的错词，空格移到下一个；全对后按 Enter。');return;
+  note('');return;
  }
  ACCESS.activity(question().questionId,'answer');p.submissions++;
  if(!exact(value)){
   const f=markCorrections(it,value);
   p.awaiting=false;p.misses++;invalidatePunishment('本轮首次提交未全对');
-  render();selectFirstMistake(f);note('直接输入替换选中的错词，空格移到下一个；全对后按 Enter 开始新一轮。');return;
+  render();selectFirstMistake(f);note('');return;
  }
  const clean=p.listens===1&&p.submissions===1&&!p.reason&&!it.errors&&!it.revealed;
  if(clean){p.blocked=false;p.awaiting=false;pass();return}
