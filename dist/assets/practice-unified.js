@@ -58,8 +58,22 @@ function editable(f,from,step){for(let i=from+step;i>=0&&i<f.slots.length;i+=ste
 function openSlot(i,{select=false,at=null}={}){
  const f=item().fix;if(!f||i<0)return;
  f.at=i;input.value=f.slots[i];
+ f.replaceOnType=!f.ok[i]&&input.value&&(!f.marked||input.value===f.marked[i])?i:null;
  const n=input.value.length,p=select?0:at==null?n:Math.min(at,n);
  input.setSelectionRange(p,select?n:p);drawWords();
+}
+// A collapsed mouse/arrow caret must replace the marked mistake too, not insert into it.
+function prepareCorrectionReplacement(){
+ if(!question()||input.readOnly)return;
+ const f=item().fix;if(!f||f.ok[f.at])return;
+ if(f.replaceOnType===undefined&&input.value===f.marked?.[f.at])f.replaceOnType=f.at;
+ if(f.replaceOnType!==f.at)return;
+ input.setSelectionRange(0,input.value.length);f.replaceOnType=null;
+}
+function correctionBeforeInput(e){
+ const kind=e.inputType||'';
+ if(kind.startsWith('delete')){if(question()&&item().fix)item().fix.replaceOnType=null;return}
+ if(kind.startsWith('insert')&&(kind!=='insertText'||/\S/.test(e.data||'')))prepareCorrectionReplacement();
 }
 // Typing in a slot; a space finishes the word and moves on to the next word still to fix.
 function fixInput(f){
@@ -609,10 +623,10 @@ PTE.resetProgress=()=>{clearTimers();progress.clear();heard.clear()};
 PTE.onShown=()=>{render();focusInput()};
 
 // ---------- Events ----------
-input.addEventListener('compositionstart',()=>{composing=true;composed=''});
+input.addEventListener('compositionstart',()=>{prepareCorrectionReplacement();composing=true;composed=''});
 input.addEventListener('compositionend',()=>{composing=false;composed='';handleInput({isComposing:false})});
 input.addEventListener('compositionupdate',e=>editTone(compositionKind(e.data||'')));
-input.addEventListener('beforeinput',editSound);
+input.addEventListener('beforeinput',e=>{correctionBeforeInput(e);editSound(e)});
 input.addEventListener('input',editSound);
 input.addEventListener('input',handleInput);
 function handleInput(e){
@@ -639,6 +653,8 @@ function handleInput(e){
 }
 input.addEventListener('keydown',e=>{
  keySound(e);
+ if(e.key.length===1&&/\S/.test(e.key)&&!e.ctrlKey&&!e.metaKey&&!e.altKey)prepareCorrectionReplacement();
+ if(e.key==='Backspace'||e.key==='Delete'){if(question()&&item().fix)item().fix.replaceOnType=null}
  if(e.isComposing||e.keyCode===229)return;
  // Ctrl/Cmd+Enter is the backup answer key (handled below), not a check.
  if(e.key==='Enter'&&(e.ctrlKey||e.metaKey))return;

@@ -10,7 +10,7 @@ function setup(storage={},sentence='The site is interactive.'){
  const PTE={active:q,questions:[q,other],notes:{},posLabels:{},states:{},phrasesOf:()=>[q.sentence],findQuestion:k=>[q,other].find(x=>x.questionKey===k),visible:()=>[q,other],phraseAudio:()=>null,render(){},setState(k,v){PTE.states[k]={...PTE.states[k],...v}},dailyStats:{complete(){completed++}},book:{skip:()=>false,miss(){},credit:()=>false,save(){}},noteFor:()=>null,ready:new Promise(()=>{})};
  const context={$,document,PTE,ACCESS:{selected:0,ready:new Promise(()=>{}),activity(){},feature(){},ensureStudy:async()=>true},window:{addEventListener(){}},localStorage:{getItem:k=>storage[k]??null,setItem(k,v){storage[k]=v}},tokens:s=>(s.toLowerCase().match(/[a-z0-9]+(?:'[a-z0-9]+)*/g)||[]),esc:s=>String(s),matchMedia:()=>({matches:true}),setTimeout:()=>0,clearTimeout(){},Date,console,performance:{now:()=>0},requestAnimationFrame:f=>f()};function $(id){return el(id)}
  context.window=context;context.addEventListener=()=>{};
- const hooks='window.testEngine={check,state,punishment,restart,nextPunishmentAttempt,toggleAnswer,render,saveProgress,toggleLoop,handleInput,playCurrent,playChosen,maybeAutoplay,enabled:()=>punishmentEnabled};';
+ const hooks='window.testEngine={check,state,punishment,restart,nextPunishmentAttempt,toggleAnswer,render,saveProgress,toggleLoop,handleInput,playCurrent,playChosen,maybeAutoplay,openSlot,enabled:()=>punishmentEnabled};';
  const previewSource=fs.readFileSync(require('node:path').join(__dirname,'../dist/assets/practice-preview.js'),'utf8');
  vm.runInNewContext(previewSource.slice(previewSource.indexOf('const STATE_KEY='),previewSource.indexOf('// ---------- Search')),context);
  vm.runInNewContext(source.replace(/\}\)\(\);\s*$/,hooks+'})();'),context);
@@ -158,7 +158,8 @@ function type(h,text){h.t.state().whole.fix=null;h.el('typing').value=text;h.t.h
  h=setup();h.t.toggleAnswer();h.el('typing').value='t';h.t.handleInput({isComposing:true});assert(h.el('reference').hidden,'composition input also hides answers immediately');
  // Actual input selection and keyboard replacement, including the sentence in the user's screenshot.
  function insertText(h,text){
-  const box=h.el('typing'),start=box.selectionStart,end=box.selectionEnd;
+  const box=h.el('typing');box.events.beforeinput({inputType:'insertText',data:text,target:box});
+  const start=box.selectionStart,end=box.selectionEnd;
   box.value=box.value.slice(0,start)+text+box.value.slice(end);
   box.setSelectionRange(start+text.length,start+text.length);h.t.handleInput({isComposing:false});
  }
@@ -182,5 +183,24 @@ function type(h,text){h.t.state().whole.fix=null;h.el('typing').value=text;h.t.h
  h=setup();h.click('punishmentToggle');await listen(h);h.answer('The is interactive.');
  assert.equal(h.t.state().whole.fix.at,1);assert.equal(h.el('typing').value,'','missing word opens an empty slot');
  insertText(h,'site');enter(h);await tick();assert.equal(h.t.punishment().round,2);
- console.log('PASS: selected-word replacement, space-to-next mistake, missing words, correct-then-Enter retries, same-round clear/redo, persistent round counts, typing auto-hide, normal mode.');
+ // Clicking inside a marked mistake or moving in by arrow still replaces it on the first character.
+ for(const challenge of [false,true]){
+  h=setup({},wildlife);if(challenge)h.click('punishmentToggle');await listen(h);
+  h.answer('the plight of wildlife has frequdently been overlooked the development');
+  const f=h.t.state().whole.fix;
+  h.t.openSlot(5,{at:4});assert.equal(h.el('typing').selectionStart,4);assert.equal(h.el('typing').selectionEnd,4);
+  insertText(h,'f');assert.equal(h.el('typing').value,'f','typing at a collapsed caret replaces the entire wrong word');
+  insertText(h,'r');assert.equal(h.el('typing').value,'fr','second keystroke appends normally');
+  h.t.openSlot(5,{at:1});insertText(h,'x');assert.equal(h.el('typing').value,'fxr','editing a new partial spelling does not clear it again');
+  h.t.openSlot(8,{at:Infinity});insertText(h,'i');assert.equal(h.el('typing').value,'i','keyboard entry at the end also replaces the mistake');
+  insertText(h,'n');assert.equal(h.el('typing').value,'in');assert.equal(f.slots[9],'development');
+  assert.equal(h.PTE.roundCount('q1'),1);assert.equal(h.plays(),1);
+ }
+ h=setup();h.click('punishmentToggle');await listen(h);h.answer('The syte is interactive.');
+ h.t.openSlot(1,{at:2});h.el('typing').events.compositionstart();
+ assert.equal(h.el('typing').selectionStart,0);assert.equal(h.el('typing').selectionEnd,4,'IME also selects the old mistake before composing');
+ h.el('typing').value='site';h.el('typing').events.compositionend();assert.equal(h.t.state().whole.fix.slots[1],'site');
+ h.t.openSlot(1,{at:1});h.el('typing').events.beforeinput({inputType:'deleteContentBackward',target:h.el('typing')});
+ assert.equal(h.t.state().whole.fix.replaceOnType,null,'manual deletion remains available');
+ console.log('PASS: collapsed-caret first-letter replacement, continued typing, mid-word edits, IME, selected corrections, same-round redo, round totals, existing practice rules.');
 })().catch(e=>{console.error(e);process.exitCode=1});
