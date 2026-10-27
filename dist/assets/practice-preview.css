@@ -305,3 +305,9 @@ html.immersive-open{overflow:hidden}
 .punishment-rules p+p{margin-top:7px}
 .punishment-controls [hidden]{display:none!important}
 @media(max-width:420px){.punishment-controls{gap:7px}.punishment-controls #punishmentProgress{font-size:11px}.punishment-controls #punishmentRetry{padding:4px 7px}.punishment-controls #punishmentRetry span{display:none}}
+
+/* Per-question round history stays subtle beside existing practice status. */
+.row .practice-state{grid-area:state;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:4px;align-self:center}
+.row .practice-state .state{align-self:auto;white-space:nowrap}
+.round-count{font-size:11px;line-height:1.5;color:#8c94a5;white-space:nowrap;font-variant-numeric:tabular-nums}
+.hint .practice-rounds{margin-left:auto;font-size:11px;color:#9990a7;white-space:nowrap;font-variant-numeric:tabular-nums}

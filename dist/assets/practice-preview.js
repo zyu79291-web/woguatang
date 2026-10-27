@@ -31,7 +31,10 @@ PTE.phraseAudio=(q,step)=>{
 // Practice status stays on this device (survives reloads and new tabs); never sent anywhere.
 const STATE_KEY='pte:summary-preview:v1';
 try{PTE.states=JSON.parse(localStorage.getItem(STATE_KEY)||sessionStorage.getItem(STATE_KEY)||'{}')}catch{}
-PTE.setState=(key,patch)=>{PTE.states[key]={...PTE.states[key],...patch};try{localStorage.setItem(STATE_KEY,JSON.stringify(PTE.states))}catch{}PTE.render()};
+PTE.saveStates=()=>{try{localStorage.setItem(STATE_KEY,JSON.stringify(PTE.states))}catch{}PTE.render()};
+PTE.setState=(key,patch)=>{PTE.states[key]={...PTE.states[key],...patch};PTE.saveStates()};
+PTE.roundCount=key=>Number.isSafeInteger(PTE.states[key]?.practiceRounds)?Math.max(0,PTE.states[key].practiceRounds):0;
+PTE.roundLabel=key=>{const n=PTE.roundCount(key),s=PTE.states[key];return !n&&s?.practiced?'轮数未记录':`${s?.roundHistoryPartial?'至少':'累计'} ${n} 轮`};
 PTE.stateLabel=key=>{const s=PTE.states[key];return s?.state==='mastered'?'已练会':s?.state==='review'?'需要复习':s?.practiced?'已练过':s?.started?'练习中':'未练过'};
 
 // ---------- Search ----------
@@ -248,7 +251,7 @@ function noteChips(notes){
 function rowHtml(q,searching,index=''){
  const label=PTE.stateLabel(q.questionKey),latest=(q.recentHits||'').split('\n')[0],selected=PTE.active?.questionKey===q.questionKey;
  const outside=searching&&!q.full&&!(q.changeHits>0)?'<span class="out-tag">非本周高频</span>':'';
- return `<div class="row ${PTE.active?.questionKey===q.questionKey?'selected':''}" data-key="${esc(q.questionKey)}" tabindex="0" role="button" aria-label="练习：${esc(q.sentence)}"><span class="idx">${index}</span><div class="text"><div class="sentence">${esc(q.sentence)}${outside}</div>${q.translation?`<div class="translation">${esc(q.translation)}</div>`:''}${selected?noteHtml(q.notes):noteChips(q.notes)}</div><div class="recent">${latest?`<span>${esc(latest)}</span>`:'<span class="muted">暂无记录</span>'}</div><span class="state tag ${({'未练过':'','练习中':'doing'})[label]??'done'}">${label}</span></div>`;
+ return `<div class="row ${PTE.active?.questionKey===q.questionKey?'selected':''}" data-key="${esc(q.questionKey)}" tabindex="0" role="button" aria-label="练习：${esc(q.sentence)}"><span class="idx">${index}</span><div class="text"><div class="sentence">${esc(q.sentence)}${outside}</div>${q.translation?`<div class="translation">${esc(q.translation)}</div>`:''}${selected?noteHtml(q.notes):noteChips(q.notes)}</div><div class="recent">${latest?`<span>${esc(latest)}</span>`:'<span class="muted">暂无记录</span>'}</div><div class="practice-state"><span class="state tag ${({'未练过':'','练习中':'doing'})[label]??'done'}">${label}</span><span class="round-count" title="每次开始新的听写计一轮，修改、重听和刷新不重复计数；旧版本未保存的轮数无法补全。">${PTE.roundLabel(q.questionKey)}</span></div></div>`;
 }
 PTE.render=()=>{
  const query=PTE.searchQuery(),rows=PTE.visible(),extra=fullBankMatches(query);

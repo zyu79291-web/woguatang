@@ -29,8 +29,9 @@ const parts=()=>PTE.phrasesOf(question());
 function stateOf(q){
  let st=progress.get(q.questionKey);
  if(st?.savedSentence&&st.savedSentence!==q.sentence){progress.delete(q.questionKey);st=null}
- if(!st){st={mode:preferredMode,step:0,chunks:PTE.phrasesOf(q).map(blank),whole:blank(),started:{},ended:{}};progress.set(q.questionKey,st)}
+ if(!st){st={mode:preferredMode,step:0,chunks:PTE.phrasesOf(q).map(blank),whole:blank(),started:{},ended:{},roundRecorded:false};progress.set(q.questionKey,st)}
  st.mode='whole';
+ if(seedRoundHistory(q,st))PTE.saveStates?.();
  return st;
 }
 const state=()=>stateOf(question());
@@ -68,6 +69,35 @@ function fixInput(f){
  for(const w of parts.slice(1)){const next=editable(f,i,1);if(next<0)break;i=next;if(w)f.slots[i]=w}
  if(i===f.at){input.value=parts[0];toEnd();return}
  openSlot(i,parts.at(-1)?{}:{select:true});
+}
+// Lifetime question counts live beside practice status, so resets and weekly bank updates keep them.
+function seedRoundHistory(q,st){
+ const saved=PTE.states[q.questionKey]||{};
+ if(Number.isSafeInteger(saved.practiceRounds))return false;
+ const begun=typeof st.roundRecorded==='boolean'?st.roundRecorded:
+  !!(st.whole.text||st.whole.checked||st.whole.passed||st.started?.whole||st.punishment?.listens);
+ const p=st.punishment,known=p?.v===2&&Number.isSafeInteger(p.round)?Math.max(0,p.round-(begun?0:1)):begun?1:0;
+ if(st.roundRecorded===undefined)st.roundRecorded=begun;
+ if(!known)return false;
+ PTE.states[q.questionKey]={...saved,practiceRounds:known,roundHistoryPartial:true};
+ return true;
+}
+function recordRound(q,st){
+ const seeded=seedRoundHistory(q,st);
+ if(st.roundRecorded){if(seeded)PTE.saveStates?.();return}
+ st.roundRecorded=true;
+ const saved=PTE.states[q.questionKey]||{},n=Number.isSafeInteger(saved.practiceRounds)?saved.practiceRounds:0;
+ PTE.setState(q.questionKey,{practiceRounds:n+1,roundHistoryPartial:saved.roundHistoryPartial??!!saved.practiced,started:true});
+ if(question()===q)$('practiceRounds').textContent=PTE.roundLabel?.(q.questionKey)||`累计 ${n+1} 轮`;
+ saveProgress();
+}
+function hideAnswerForTyping(){
+ if(!answerVisible)return;
+ answerVisible=false;
+ $('reference').hidden=true;$('reference').textContent='';$('cue').textContent='';
+ document.querySelector('.cue-line').hidden=true;
+ $('show').setAttribute('aria-pressed','false');$('show').textContent='答案';
+ // The answer was still seen in this round; only its visibility changes.
 }
 function resetQuestion(q,{keepPunishment=false}={}){
  const previous=progress.get(q.questionKey),saved=keepPunishment&&previous?.punishment&&!previous.whole.passed?previous.punishment:null;
@@ -137,11 +167,14 @@ async function playOnce(src,seq,qid=question()?.questionId){
  if(!src)throw Error('缺少本题原版录音');
  if(seq!==player.seq)return;
  // Capture this round before playback: a cancelled request must never charge a new round.
- const q=question(),p=punishmentEnabled&&q?.questionId===qid&&!finished()?punishment():null;
+ const q=question(),st=q?.questionId===qid?state():null,practice=player.kind==='current';
+ const p=punishmentEnabled&&st&&!finished(st)?punishment():null;
  return new Promise((resolve,reject)=>{
   audio.src=src;audio.onended=resolve;audio.onerror=()=>reject(Error('原版录音加载失败'));
   audio.play().then(()=>{
-   if(!p||seq!==player.seq||!punishmentEnabled||question()!==q||state().punishment!==p)return;
+   if(seq!==player.seq||question()!==q||!st||state()!==st)return;
+   if(practice&&!finished(st))recordRound(q,st);
+   if(!p||!punishmentEnabled||st.punishment!==p)return;
    p.listens++;
    if(p.listens>1)invalidatePunishment('本轮已重听');
    else{renderPunishment();saveProgress()}
@@ -408,6 +441,7 @@ function render(){
  const st=state(),it=item(st),p=parts(),whole=st.mode==='whole',done=finished(st),split=p.length>1;
  if(!whole&&!done&&split)ACCESS.feature(q.questionId,'chunks');
  updateCount();
+ $('practiceRounds').textContent=PTE.roundLabel?.(q.questionKey)||`累计 ${PTE.states[q.questionKey]?.practiceRounds||0} 轮`;
  $('mode').textContent=done?'本题完成':'整句听写';
  // English stays hidden while listening; a failed check only marks the words. “答案” reveals it until the phrase is
  // passed, after which the green words themselves show the answer.
@@ -574,7 +608,10 @@ function handleInput(e){
   const tidy=input.value.replace(/^\s+/,'').replace(/\s{2,}/g,' ');
   if(tidy!==input.value&&(input.selectionStart??input.value.length)>=input.value.length){input.value=tidy;toEnd()}
  }
- it.text=typed(it);saveProgress();
+ it.text=typed(it);
+ if(input.value.length)hideAnswerForTyping();
+ if(it.text.trim())recordRound(q,st);
+ saveProgress();
  if(it.text&&!st.started[st.mode])st.started[st.mode]=Date.now();
  // Typing never stops the audio: learners jot initials while listening, as in the real exam.
  heard.add(stepKey(st));
@@ -631,7 +668,7 @@ $('punishmentToggle').addEventListener('click',()=>{
  if(!question())return;
  punishmentEnabled=!punishmentEnabled;clearTimers();cancelAudio();answerVisible=false;
  // A mode switch begins a new attempt, leaving learned questions and daily records intact.
- const st=state();st.whole=blank();delete st.ended.whole;
+ const st=state();st.whole=blank();st.roundRecorded=false;delete st.ended.whole;
  delete st.punishment;
  if(punishmentEnabled)st.punishment=newPunishmentRound();
  for(const key of heard)if(key.startsWith(question().questionKey+':'))heard.delete(key);
@@ -666,6 +703,8 @@ audio.addEventListener('error',()=>{if(player.kind)note('音频加载失败，�
 // Everyone lands on the first question: whole-sentence practice without a code, meaning groups with one.
 // A deep link (?t=<code>) lands on its question instead, opened in immersive practice, and tries to play it once.
 Promise.all([PTE.ready,ACCESS.ready]).then(async()=>{
+ let migrated=false;for(const [key,st] of progress){const q=PTE.findQuestion(key);if(q&&seedRoundHistory(q,st))migrated=true}
+ if(migrated)PTE.saveStates?.();
  const linked=PTE.linkedQuestion?.(),first=linked||PTE.findQuestion(resumedSession.active)||PTE.visible()[0]||PTE.questions[0];if(!first)return;
  await PTE.select(first.questionKey,{resume:true});
  if(!linked||PTE.active!==linked)return;
