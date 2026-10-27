@@ -202,5 +202,12 @@ function type(h,text){h.t.state().whole.fix=null;h.el('typing').value=text;h.t.h
  h.el('typing').value='site';h.el('typing').events.compositionend();assert.equal(h.t.state().whole.fix.slots[1],'site');
  h.t.openSlot(1,{at:1});h.el('typing').events.beforeinput({inputType:'deleteContentBackward',target:h.el('typing')});
  assert.equal(h.t.state().whole.fix.replaceOnType,null,'manual deletion remains available');
+ // Random order is persisted in the existing session backup without touching the draft or round count.
+ h=setup();type(h,'my current draft');const roundsBefore=h.PTE.roundCount('q1'),playsBefore=h.plays();
+ h.PTE.toggleRandomPractice();assert(h.PTE.practiceOrder.enabled);assert.equal(h.el('typing').value,'my current draft');
+ assert.equal(h.PTE.roundCount('q1'),roundsBefore);assert.equal(h.plays(),playsBefore);
+ assert.equal(JSON.parse(h.storage['woguatang-session-v1']).practiceOrder.enabled,true);
+ restored=setup({...h.storage});assert(restored.PTE.practiceOrder.enabled);assert.equal(restored.el('typing').value,'my current draft');
+ restored.PTE.toggleRandomPractice();assert.equal(JSON.parse(restored.storage['woguatang-session-v1']).practiceOrder.enabled,false);
  console.log('PASS: collapsed-caret first-letter replacement, continued typing, mid-word edits, IME, selected corrections, same-round redo, round totals, existing practice rules.');
 })().catch(e=>{console.error(e);process.exitCode=1});

@@ -311,3 +311,16 @@ html.immersive-open{overflow:hidden}
 .row .practice-state .state{align-self:auto;white-space:nowrap}
 .round-count{font-size:11px;line-height:1.5;color:#8c94a5;white-space:nowrap;font-variant-numeric:tabular-nums}
 .hint .practice-rounds{margin-left:auto;font-size:11px;color:#9990a7;white-space:nowrap;font-variant-numeric:tabular-nums}
+
+/* Stable random practice, available in the list and the immersive practice menu. */
+.toolbar{flex-wrap:wrap}
+.random-practice,.reshuffle-practice{flex:none;border:1px solid #ddd5ed;border-radius:8px;padding:8px 11px;background:#faf8fe;color:#75658b;white-space:nowrap;font-size:12px;font-weight:600}
+.random-practice[aria-pressed="true"]{background:#eee8fa;border-color:#c5b5df;color:#68518a}
+.random-practice:hover,.reshuffle-practice:hover{background:#f0eaf9}
+.reshuffle-practice{border-color:transparent;background:transparent;color:#8b7c9c;font-weight:400}
+#reshufflePractice[hidden],#reshuffleFromDock[hidden]{display:none!important}
+.more-menu #randomFromDock[aria-pressed="true"]{color:#dbc5f5;background:#392d48}
+
+@media(max-width:900px){.toolbar select{flex:1 1 125px;min-width:125px}}
+
+.practice-order-controls{display:inline-flex;align-items:center;gap:3px;flex:none}

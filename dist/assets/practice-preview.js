@@ -37,6 +37,49 @@ PTE.roundCount=key=>Number.isSafeInteger(PTE.states[key]?.practiceRounds)?Math.m
 PTE.roundLabel=key=>`累计 ${PTE.roundCount(key)} 轮`;
 PTE.stateLabel=key=>{const s=PTE.states[key];return s?.state==='mastered'?'已练会':s?.state==='review'?'需要复习':s?.practiced?'已练过':s?.started?'练习中':'未练过'};
 
+// Stable shuffled order: only explicit shuffle actions change the sequence.
+PTE.practiceOrder={enabled:false,keys:[]};
+try{
+ const saved=JSON.parse(localStorage.getItem('woguatang-session-v1')||'{}').practiceOrder;
+ if(saved&&Array.isArray(saved.keys))PTE.practiceOrder={enabled:saved.enabled===true,keys:[...new Set(saved.keys.filter(k=>typeof k==='string'))].slice(0,20000)};
+}catch{}
+function shuffledQuestions(rows){
+ const out=[...rows];
+ for(let i=out.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[out[i],out[j]]=[out[j],out[i]]}
+ return out;
+}
+function applyPracticeOrder(rows){
+ if(!PTE.practiceOrder.enabled)return rows;
+ const available=new Set(PTE.questions.map(q=>q.questionKey)),kept=PTE.practiceOrder.keys.filter(k=>available.has(k)),seen=new Set(kept);
+ const added=shuffledQuestions(PTE.questions.filter(q=>!seen.has(q.questionKey))).map(q=>q.questionKey);
+ PTE.practiceOrder.keys=[...kept,...added];
+ const rank=new Map(PTE.practiceOrder.keys.map((key,i)=>[key,i]));
+ return [...rows].sort((a,b)=>rank.get(a.questionKey)-rank.get(b.questionKey));
+}
+function updatePracticeOrderControls(){
+ const on=PTE.practiceOrder.enabled;
+ for(const id of ['randomPractice','randomFromDock']){
+  const button=$(id);if(!button)continue;
+  button.textContent=on?'随机练习：开':'随机练习：关';button.setAttribute('aria-pressed',String(on));
+ }
+ for(const id of ['reshufflePractice','reshuffleFromDock'])if($(id))$(id).hidden=!on;
+}
+function savePracticeOrder(){
+ PTE.render();PTE.flushProgress?.();PTE.backupProgress?.();PTE.focusPractice?.();
+}
+PTE.shufflePractice=()=>{
+ const current=PTE.questions.find(q=>q.questionKey===PTE.active?.questionKey);
+ const rest=shuffledQuestions(PTE.questions.filter(q=>q!==current));
+ PTE.practiceOrder={enabled:true,keys:[...(current?[current.questionKey]:[]),...rest.map(q=>q.questionKey)]};
+ savePracticeOrder();
+};
+PTE.toggleRandomPractice=()=>{
+ if(!PTE.practiceOrder.enabled){PTE.shufflePractice();return}
+ PTE.practiceOrder.enabled=false;savePracticeOrder();
+};
+for(const id of ['randomPractice','randomFromDock'])$(id)?.addEventListener('click',PTE.toggleRandomPractice);
+for(const id of ['reshufflePractice','reshuffleFromDock'])$(id)?.addEventListener('click',PTE.shufflePractice);
+
 // ---------- Search ----------
 // Learners often remember only the gist, so matching is fuzzy: English words match exactly, by stem, by prefix or
 // with a small typo; Chinese matches by shared character pairs in the translation and notes. A bare number is
@@ -93,7 +136,7 @@ function search(pool,query){
  if(/^\d+$/.test(query))return pool.filter(q=>String(q.sourceIds||'').split(/\s+/).includes(query));
  return pool.map(q=>[q,matchScore(q,query)]).filter(([,s])=>s>=.5).sort((a,b)=>b[1]-a[1]).map(([q])=>q);
 }
-PTE.visible=()=>{const query=PTE.searchQuery();return (query?search(PTE.questions,query):PTE.questions.filter(inScope)).filter(statusOk)};
+PTE.visible=()=>{const query=PTE.searchQuery();return applyPracticeOrder((query?search(PTE.questions,query):PTE.questions.filter(inScope)).filter(statusOk))};
 // Optional complete bank (e.g. scraped by a separate task) for questions outside the curated list.
 PTE.fullBank=[];PTE.archivedQuestions=[];
 PTE.findQuestion=key=>PTE.questions.find(q=>q.questionKey===key)||PTE.fullBank.find(q=>q.questionKey===key)||PTE.archivedQuestions.find(q=>q.questionKey===key);
@@ -254,6 +297,7 @@ function rowHtml(q,searching,index=''){
  return `<div class="row ${PTE.active?.questionKey===q.questionKey?'selected':''}" data-key="${esc(q.questionKey)}" tabindex="0" role="button" aria-label="练习：${esc(q.sentence)}"><span class="idx">${index}</span><div class="text"><div class="sentence">${esc(q.sentence)}${outside}</div>${q.translation?`<div class="translation">${esc(q.translation)}</div>`:''}${selected?noteHtml(q.notes):noteChips(q.notes)}</div><div class="recent">${latest?`<span>${esc(latest)}</span>`:'<span class="muted">暂无记录</span>'}</div><div class="practice-state"><span class="state tag ${({'未练过':'','练习中':'doing'})[label]??'done'}">${label}</span><span class="round-count" title="已记录的累计练习轮数；清空重做、修改、重听和刷新不重复计数。">${PTE.roundLabel(q.questionKey)}</span></div></div>`;
 }
 PTE.render=()=>{
+ updatePracticeOrderControls();
  const query=PTE.searchQuery(),rows=PTE.visible(),extra=fullBankMatches(query);
  const done=rows.filter(q=>PTE.states[q.questionKey]?.practiced).length;
  $('count').innerHTML=!query?`共 ${rows.length} 道 · <span class="list-progress">已练 ${done} / ${rows.length}</span>`:/^\d+$/.test(query)?`按题号匹配到 ${rows.length+extra.length} 道`:`找到 ${rows.length+extra.length} 道相关题目（按相似度排序）`;

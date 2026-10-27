@@ -14,7 +14,7 @@ try{resumedSession=JSON.parse(localStorage.getItem(SESSION_KEY)||'{}');for(const
 function saveProgress(){
  try{
   const items={};for(const [key,st] of progress){const q=PTE.findQuestion(key);if(!q)continue;const elapsed={};for(const mode of ['whole','chunks'])if(st.started?.[mode])elapsed[mode]=Math.max(0,(st.ended?.[mode]||Date.now())-st.started[mode]);items[key]={sentence:q.sentence,st,elapsed}}
-  localStorage.setItem(SESSION_KEY,JSON.stringify({v:1,punishmentEnabled,active:PTE.active?.questionKey||resumedSession.active,items},(key,value)=>value instanceof Set?[...value]:value));
+  localStorage.setItem(SESSION_KEY,JSON.stringify({v:1,punishmentEnabled,practiceOrder:PTE.practiceOrder,active:PTE.active?.questionKey||resumedSession.active,items},(key,value)=>value instanceof Set?[...value]:value));
  }catch{}
 }
 PTE.flushProgress=saveProgress;window.addEventListener('pagehide',saveProgress);
@@ -144,6 +144,7 @@ function clearTimers(){clearTimeout(advanceTimer);clearTimeout(checkTimer);hideC
 // Rating shown after each phrase and for the whole question.
 const rate=it=>it.revealed?'Done':it.errors===0?'Perfect':it.errors===1?'Great':'Good';
 const dockHidden=()=>dock.hidden;
+PTE.focusPractice=()=>focusInput();
 function focusInput(){if(dockHidden()||!question())return;input.focus({preventScroll:true});toEnd()}
 function toEnd(){if(composing)return;const n=input.value.length;if(input.selectionStart!==n||input.selectionEnd!==n)input.setSelectionRange(n,n)}
 // Typed words with their character ranges in the input, split exactly like tokens().
@@ -595,7 +596,7 @@ async function nextQuestion(delta=1){
 function updateCount(){
  const q=question();if(!q)return;
  const rows=PTE.visible(),i=rows.findIndex(x=>x.questionKey===q.questionKey);
- $('dockCount').textContent=i>=0?`${i+1} / ${rows.length}`:'';
+ $('dockCount').textContent=i>=0?`${PTE.practiceOrder?.enabled?'随机 · ':''}${i+1} / ${rows.length}`:'';
 }
 PTE.afterListRender=updateCount;
 function toggleAnswer(){if(!question())return;answerVisible=!answerVisible;if(answerVisible){item().revealed=true;invalidatePunishment('本轮已看答案')}render();focusInput()}

@@ -1,0 +1,40 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),path=require('node:path');
+const preview=fs.readFileSync(path.join(__dirname,'../dist/assets/practice-preview.js'),'utf8');
+const engine=fs.readFileSync(path.join(__dirname,'../dist/assets/practice-unified.js'),'utf8');
+function setup(saved){
+ const elements=new Map(),q=Array.from({length:12},(_,i)=>({questionKey:'q'+i,sentence:'Question '+i}));
+ let persisted,flushes=0,played=0,filter=()=>true;
+ const $=id=>{if(!elements.has(id))elements.set(id,{hidden:false,textContent:'',events:{},setAttribute(k,v){this[k]=v},addEventListener(k,f){this.events[k]=f}});return elements.get(id)};
+ const PTE={questions:q,active:q[5],states:{},searchQuery:()=>'',render(){},flushProgress(){persisted=JSON.parse(JSON.stringify(PTE.practiceOrder));flushes++},select:async key=>{PTE.active=q.find(x=>x.questionKey===key);played++}};
+ let seed=17;const math=Object.create(Math);math.random=()=>{seed=(seed*16807)%2147483647;return(seed-1)/2147483646};
+ const context={PTE,$,Math:math,localStorage:{getItem:()=>JSON.stringify({practiceOrder:saved})},search:rows=>rows,inScope:()=>true,statusOk:r=>filter(r),question:()=>PTE.active,punishmentEnabled:false,focusInput(){},note(){}};
+ vm.createContext(context);
+ vm.runInContext(preview.slice(preview.indexOf('// Stable shuffled order:'),preview.indexOf('// ---------- Search')),context);
+ vm.runInContext(preview.slice(preview.indexOf('PTE.visible=()=>'),preview.indexOf('// Optional complete bank')),context);
+ PTE.render=()=>vm.runInContext('updatePracticeOrderControls()',context);
+ vm.runInContext(engine.slice(engine.indexOf('async function nextQuestion('),engine.indexOf('// Position in the current list')),context);
+ return{PTE,q,$,context,keys:()=>Array.from(PTE.visible(),x=>x.questionKey),saved:()=>persisted,flushes:()=>flushes,played:()=>played,setFilter:f=>{filter=f}};
+}
+(async()=>{
+ let h=setup(),original=h.q.map(q=>q.questionKey);h.q[5].draft='KEEP';
+ assert.deepEqual(h.keys(),original);h.$('randomPractice').events.click();
+ const mixed=h.keys();assert.equal(mixed[0],'q5','keep current question as the starting point');
+ assert.deepEqual([...mixed].sort(),[...original].sort());assert.equal(new Set(mixed).size,12,'no duplicates or omissions');
+ assert.notDeepEqual(mixed.slice(1),original.filter(k=>k!=='q5'),'remaining questions are actually shuffled');
+ assert.deepEqual(h.keys(),mixed,'render/read does not reshuffle');assert.deepEqual(h.q.map(q=>q.questionKey),original,'source bank stays in its original order');
+ assert.equal(h.PTE.active.draft,'KEEP');assert.equal(h.played(),0,'changing order does not replace the current question or replay audio');
+ assert.equal(h.$('randomFromDock')['aria-pressed'],'true');assert.equal(h.$('reshufflePractice').hidden,false);
+ await vm.runInContext('nextQuestion(1)',h.context);assert.equal(h.PTE.active.questionKey,mixed[1],'next follows shuffled list');
+ await vm.runInContext('nextQuestion(-1)',h.context);assert.equal(h.PTE.active.questionKey,mixed[0],'previous follows the same list');
+ h.setFilter(q=>Number(q.questionKey.slice(1))%2===0);assert.deepEqual(h.keys(),mixed.filter(k=>Number(k.slice(1))%2===0));
+ h.setFilter(()=>true);assert.deepEqual(h.keys(),mixed,'filtering does not reroll the sequence');
+ const restored=setup(h.saved());assert.deepEqual(restored.keys(),mixed,'same order survives refresh');
+ h.PTE.questions.push({questionKey:'new-question'});assert.deepEqual(h.keys().slice(0,12),mixed,'new bank questions preserve existing relative order');
+ assert.equal(h.keys().at(-1),'new-question');assert.equal(h.keys().length,13);
+ h.PTE.questions=h.PTE.questions.filter(q=>q.questionKey!=='q2');assert(!h.keys().includes('q2'));assert.equal(h.keys().length,12);
+ const beforeReshuffle=h.keys();h.$('reshuffleFromDock').events.click();assert.notDeepEqual(h.keys(),beforeReshuffle);assert.equal(h.keys()[0],h.PTE.active.questionKey);
+ h.$('randomFromDock').events.click();assert.deepEqual(h.keys(),h.PTE.questions.map(q=>q.questionKey),'off restores original bank order');
+ assert.equal(h.$('randomPractice')['aria-pressed'],'false');assert.equal(h.$('reshufflePractice').hidden,true);assert.equal(h.saved().enabled,false);
+ h=setup({enabled:true,keys:['q3','q3',null,'deleted','q1']});assert.equal(new Set(h.keys()).size,12);assert.equal(h.keys().length,12,'saved queues are sanitized and repaired');
+ console.log('PASS: stable shuffle, shared previous/next order, filters, refresh, question-bank additions/removals, reshuffle, off restores original order, draft preserved.');
+})().catch(e=>{console.error(e);process.exitCode=1});
