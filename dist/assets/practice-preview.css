@@ -324,3 +324,14 @@ html.immersive-open{overflow:hidden}
 @media(max-width:900px){.toolbar select{flex:1 1 125px;min-width:125px}}
 
 .practice-order-controls{display:inline-flex;align-items:center;gap:3px;flex:none}
+
+/* Question favorites: compact stars without adding another practice instruction. */
+.row .idx{display:flex;flex-direction:column;align-items:center;gap:4px}
+.question-favorite{display:grid;place-items:center;flex:none;width:25px;height:25px;padding:3px;border:0;border-radius:6px;background:transparent;color:#938a9f}
+.favorite-icon{display:block;width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.question-favorite:hover{background:#f1edf8;color:#7b658f}
+.question-favorite[aria-pressed="true"]{color:#bb8a36}
+.question-favorite[aria-pressed="true"] .favorite-icon,.favorite-current[aria-pressed="true"] .favorite-icon{fill:currentColor}
+.actions>.favorite-current{display:grid;place-items:center;width:31px;padding:6px;color:#a599b6}
+.actions>.favorite-current[aria-pressed="true"]{color:#e4bc76;background:#352e29}
+.actions>.favorite-current:hover{color:#ebcb91}

@@ -209,5 +209,12 @@ function type(h,text){h.t.state().whole.fix=null;h.el('typing').value=text;h.t.h
  assert.equal(JSON.parse(h.storage['woguatang-session-v1']).practiceOrder.enabled,true);
  restored=setup({...h.storage});assert(restored.PTE.practiceOrder.enabled);assert.equal(restored.el('typing').value,'my current draft');
  restored.PTE.toggleRandomPractice();assert.equal(JSON.parse(restored.storage['woguatang-session-v1']).practiceOrder.enabled,false);
+ // Favoriting while practicing preserves the current draft, audio, round and saved favorite flag.
+ h=setup();h.click('punishmentToggle');await listen(h);type(h,'my draft');
+ const favoriteRounds=h.PTE.roundCount('q1'),favoritePlays=h.plays();h.click('favoriteCurrent');h.t.render();
+ assert(h.PTE.isFavorite('q1'));assert.equal(h.el('favoriteCurrent')['aria-pressed'],'true');
+ assert.equal(h.el('typing').value,'my draft');assert.equal(h.PTE.roundCount('q1'),favoriteRounds);assert.equal(h.plays(),favoritePlays);
+ restored=setup({...h.storage});assert(restored.PTE.isFavorite('q1'));assert.equal(restored.el('typing').value,'my draft');
+ restored.click('favoriteCurrent');assert(!restored.PTE.isFavorite('q1'));
  console.log('PASS: collapsed-caret first-letter replacement, continued typing, mid-word edits, IME, selected corrections, same-round redo, round totals, existing practice rules.');
 })().catch(e=>{console.error(e);process.exitCode=1});

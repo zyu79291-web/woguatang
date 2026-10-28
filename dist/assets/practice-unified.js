@@ -596,6 +596,8 @@ async function nextQuestion(delta=1){
 function updateCount(){
  const q=question();if(!q)return;
  const rows=PTE.visible(),i=rows.findIndex(x=>x.questionKey===q.questionKey);
+ const favorite=PTE.isFavorite?.(q.questionKey)===true,button=$('favoriteCurrent');
+ button.setAttribute('aria-pressed',String(favorite));button.setAttribute('aria-label',favorite?'取消收藏当前题':'收藏当前题');button.title=favorite?'取消收藏':'收藏这道题';
  $('dockCount').textContent=i>=0?`${PTE.practiceOrder?.enabled?'随机 · ':''}${i+1} / ${rows.length}`:'';
 }
 PTE.afterListRender=updateCount;
@@ -691,6 +693,7 @@ dock.addEventListener('click',e=>{
 
 $('play').addEventListener('click',()=>{void playCurrent();focusInput()});
 $('show').addEventListener('click',toggleAnswer);
+$('favoriteCurrent').addEventListener('click',()=>{if(!question())return;PTE.toggleFavorite?.(question().questionKey);focusInput()});
 function toggleLoop(){
  if(!question()||dockHidden()||$('loopAudio').disabled)return;
  if(loopEnabled)cancelAudio();

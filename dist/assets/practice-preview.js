@@ -37,6 +37,20 @@ PTE.roundCount=key=>Number.isSafeInteger(PTE.states[key]?.practiceRounds)?Math.m
 PTE.roundLabel=key=>`累计 ${PTE.roundCount(key)} 轮`;
 PTE.stateLabel=key=>{const s=PTE.states[key];return s?.state==='mastered'?'已练会':s?.state==='review'?'需要复习':s?.practiced?'已练过':s?.started?'练习中':'未练过'};
 
+// Favorites share the existing local practice store and its device backup.
+PTE.isFavorite=key=>PTE.states[key]?.favorite===true;
+PTE.toggleFavorite=key=>{PTE.setState(key,{favorite:!PTE.isFavorite(key)});PTE.backupProgress?.()};
+PTE.practicePool=()=>{
+ const pool=[...PTE.questions],known=new Set(pool.map(q=>q.questionKey));
+ for(const q of PTE.archivedQuestions||[])if(PTE.isFavorite(q.questionKey)&&!known.has(q.questionKey)){pool.push(q);known.add(q.questionKey)}
+ return pool;
+};
+const FAVORITE_STAR='<svg class="favorite-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z"></path></svg>';
+function favoriteButton(q){
+ const on=PTE.isFavorite(q.questionKey),label=(on?'取消收藏：':'收藏：')+q.sentence;
+ return `<button class="question-favorite" type="button" data-favorite="${esc(q.questionKey)}" aria-pressed="${on}" aria-label="${esc(label)}" title="${on?'取消收藏':'收藏这道题'}">${FAVORITE_STAR}</button>`;
+}
+
 // Stable shuffled order: only explicit shuffle actions change the sequence.
 PTE.practiceOrder={enabled:false,keys:[]};
 try{
@@ -50,8 +64,8 @@ function shuffledQuestions(rows){
 }
 function applyPracticeOrder(rows){
  if(!PTE.practiceOrder.enabled)return rows;
- const available=new Set(PTE.questions.map(q=>q.questionKey)),kept=PTE.practiceOrder.keys.filter(k=>available.has(k)),seen=new Set(kept);
- const added=shuffledQuestions(PTE.questions.filter(q=>!seen.has(q.questionKey))).map(q=>q.questionKey);
+ const pool=PTE.practicePool(),available=new Set(pool.map(q=>q.questionKey)),kept=PTE.practiceOrder.keys.filter(k=>available.has(k)),seen=new Set(kept);
+ const added=shuffledQuestions(pool.filter(q=>!seen.has(q.questionKey))).map(q=>q.questionKey);
  PTE.practiceOrder.keys=[...kept,...added];
  const rank=new Map(PTE.practiceOrder.keys.map((key,i)=>[key,i]));
  return [...rows].sort((a,b)=>rank.get(a.questionKey)-rank.get(b.questionKey));
@@ -68,8 +82,8 @@ function savePracticeOrder(){
  PTE.render();PTE.flushProgress?.();PTE.backupProgress?.();PTE.focusPractice?.();
 }
 PTE.shufflePractice=()=>{
- const current=PTE.questions.find(q=>q.questionKey===PTE.active?.questionKey);
- const rest=shuffledQuestions(PTE.questions.filter(q=>q!==current));
+ const pool=PTE.practicePool(),current=pool.find(q=>q.questionKey===PTE.active?.questionKey);
+ const rest=shuffledQuestions(pool.filter(q=>q!==current));
  PTE.practiceOrder={enabled:true,keys:[...(current?[current.questionKey]:[]),...rest.map(q=>q.questionKey)]};
  savePracticeOrder();
 };
@@ -128,15 +142,15 @@ function matchScore(q,query){
  }
  return scores.length?Math.max(...scores):0;
 }
-const statusOk=q=>{const st=PTE.states[q.questionKey],f=$('filter').value;return f==='all'||(f==='wrongbook'?PTE.book.has(q.questionKey):f==='practiced'?!!st?.practiced:f==='unpracticed'?!st?.practiced:st?.state===f)};
+const statusOk=q=>{const st=PTE.states[q.questionKey],f=$('filter').value;return f==='all'||(f==='favorites'?PTE.isFavorite(q.questionKey):f==='wrongbook'?PTE.book.has(q.questionKey):f==='practiced'?!!st?.practiced:f==='unpracticed'?!st?.practiced:st?.state===f)};
 // Questions with wrong words are listed wherever they are in the bank, not only within the chosen scope.
-const inScope=q=>{const s=$('scope').value;return s==='all'||$('filter').value==='wrongbook'||(s==='audio'?!!q.hasAudio:q.changeHits>0)};
+const inScope=q=>{const s=$('scope').value;return s==='all'||['wrongbook','favorites'].includes($('filter').value)||(s==='audio'?!!q.hasAudio:q.changeHits>0)};
 PTE.searchQuery=()=>$('search').value.trim();
 function search(pool,query){
  if(/^\d+$/.test(query))return pool.filter(q=>String(q.sourceIds||'').split(/\s+/).includes(query));
  return pool.map(q=>[q,matchScore(q,query)]).filter(([,s])=>s>=.5).sort((a,b)=>b[1]-a[1]).map(([q])=>q);
 }
-PTE.visible=()=>{const query=PTE.searchQuery();return applyPracticeOrder((query?search(PTE.questions,query):PTE.questions.filter(inScope)).filter(statusOk))};
+PTE.visible=()=>{const query=PTE.searchQuery(),pool=$('filter').value==='favorites'?PTE.practicePool():PTE.questions;return applyPracticeOrder((query?search(pool,query):pool.filter(inScope)).filter(statusOk))};
 // Optional complete bank (e.g. scraped by a separate task) for questions outside the curated list.
 PTE.fullBank=[];PTE.archivedQuestions=[];
 PTE.findQuestion=key=>PTE.questions.find(q=>q.questionKey===key)||PTE.fullBank.find(q=>q.questionKey===key)||PTE.archivedQuestions.find(q=>q.questionKey===key);
@@ -294,21 +308,30 @@ function noteChips(notes){
 function rowHtml(q,searching,index=''){
  const label=PTE.stateLabel(q.questionKey),latest=(q.recentHits||'').split('\n')[0],selected=PTE.active?.questionKey===q.questionKey;
  const outside=searching&&!q.full&&!(q.changeHits>0)?'<span class="out-tag">非本周高频</span>':'';
- return `<div class="row ${PTE.active?.questionKey===q.questionKey?'selected':''}" data-key="${esc(q.questionKey)}" tabindex="0" role="button" aria-label="练习：${esc(q.sentence)}"><span class="idx">${index}</span><div class="text"><div class="sentence">${esc(q.sentence)}${outside}</div>${q.translation?`<div class="translation">${esc(q.translation)}</div>`:''}${selected?noteHtml(q.notes):noteChips(q.notes)}</div><div class="recent">${latest?`<span>${esc(latest)}</span>`:'<span class="muted">暂无记录</span>'}</div><div class="practice-state"><span class="state tag ${({'未练过':'','练习中':'doing'})[label]??'done'}">${label}</span><span class="round-count" title="已记录的累计练习轮数；清空重做、修改、重听和刷新不重复计数。">${PTE.roundLabel(q.questionKey)}</span></div></div>`;
+ return `<div class="row ${PTE.active?.questionKey===q.questionKey?'selected':''}" data-key="${esc(q.questionKey)}" tabindex="0" role="button" aria-label="练习：${esc(q.sentence)}"><span class="idx"><span>${index}</span>${favoriteButton(q)}</span><div class="text"><div class="sentence">${esc(q.sentence)}${outside}</div>${q.translation?`<div class="translation">${esc(q.translation)}</div>`:''}${selected?noteHtml(q.notes):noteChips(q.notes)}</div><div class="recent">${latest?`<span>${esc(latest)}</span>`:'<span class="muted">暂无记录</span>'}</div><div class="practice-state"><span class="state tag ${({'未练过':'','练习中':'doing'})[label]??'done'}">${label}</span><span class="round-count" title="已记录的累计练习轮数；清空重做、修改、重听和刷新不重复计数。">${PTE.roundLabel(q.questionKey)}</span></div></div>`;
 }
 PTE.render=()=>{
  updatePracticeOrderControls();
- const query=PTE.searchQuery(),rows=PTE.visible(),extra=fullBankMatches(query);
+ const query=PTE.searchQuery(),rows=PTE.visible(),listed=new Set(rows.map(q=>q.questionKey));
+ const extra=fullBankMatches(query).filter(q=>statusOk(q)&&!listed.has(q.questionKey));
  const done=rows.filter(q=>PTE.states[q.questionKey]?.practiced).length;
  $('count').innerHTML=!query?`共 ${rows.length} 道 · <span class="list-progress">已练 ${done} / ${rows.length}</span>`:/^\d+$/.test(query)?`按题号匹配到 ${rows.length+extra.length} 道`:`找到 ${rows.length+extra.length} 道相关题目（按相似度排序）`;
  // Other sites' question numbers are intentionally not shown.
- $('list').innerHTML=(rows.length?rows.map((q,i)=>rowHtml(q,!!query,query?'':i+1)).join(''):extra.length?'':'<div class="empty">没有找到相关题目。可以换几个关键词，或者尝试更短的英文或中文关键词。</div>')
+ $('list').innerHTML=(rows.length?rows.map((q,i)=>rowHtml(q,!!query,query?'':i+1)).join(''):extra.length?'':`<div class="empty">${$('filter').value==='favorites'?query?'收藏中没有匹配的题目。':'还没有收藏的题目，点星标即可收藏。':'没有找到相关题目。可以换几个关键词，或者尝试更短的英文或中文关键词。'}</div>`)
   +(extra.length?`<div class="group-head"><span>完整题库中的其他题目</span></div>${extra.map(q=>rowHtml(q,true)).join('')}`:'');
  PTE.afterListRender?.();
 };
 
-$('list').addEventListener('click',e=>{const row=e.target.closest('.row');if(row)PTE.select?.(row.dataset.key,{fromList:true,play:true})});
-$('list').addEventListener('keydown',e=>{const row=e.target.closest('.row');if(row&&(e.key==='Enter'||e.key===' ')){e.preventDefault();PTE.select?.(row.dataset.key,{fromList:true,play:true})}});
+$('list').addEventListener('click',e=>{
+ const favorite=e.target.closest('[data-favorite]');
+ if(favorite){
+  e.stopPropagation();const key=favorite.dataset.favorite;PTE.toggleFavorite(key);
+  const replacement=[...$('list').querySelectorAll('[data-favorite]')].find(button=>button.dataset.favorite===key);
+  (replacement||$('filter')).focus({preventScroll:true});return;
+ }
+ const row=e.target.closest('.row');if(row)PTE.select?.(row.dataset.key,{fromList:true,play:true});
+});
+$('list').addEventListener('keydown',e=>{if(e.target.closest('[data-favorite]'))return;const row=e.target.closest('.row');if(row&&(e.key==='Enter'||e.key===' ')){e.preventDefault();PTE.select?.(row.dataset.key,{fromList:true,play:true})}});
 for(const id of ['search','scope','filter'])$(id).addEventListener('input',PTE.render);
 $('search').addEventListener('focus',()=>{$('searchHint').hidden=false});
 $('search').addEventListener('blur',()=>{$('searchHint').hidden=true});

@@ -9,7 +9,7 @@ function setup(saved){
  let seed=17;const math=Object.create(Math);math.random=()=>{seed=(seed*16807)%2147483647;return(seed-1)/2147483646};
  const context={PTE,$,Math:math,localStorage:{getItem:()=>JSON.stringify({practiceOrder:saved})},search:rows=>rows,inScope:()=>true,statusOk:r=>filter(r),question:()=>PTE.active,punishmentEnabled:false,focusInput(){},note(){}};
  vm.createContext(context);
- vm.runInContext(preview.slice(preview.indexOf('// Stable shuffled order:'),preview.indexOf('// ---------- Search')),context);
+ vm.runInContext(preview.slice(preview.indexOf('// Favorites share'),preview.indexOf('// ---------- Search')),context);
  vm.runInContext(preview.slice(preview.indexOf('PTE.visible=()=>'),preview.indexOf('// Optional complete bank')),context);
  PTE.render=()=>vm.runInContext('updatePracticeOrderControls()',context);
  vm.runInContext(engine.slice(engine.indexOf('async function nextQuestion('),engine.indexOf('// Position in the current list')),context);
