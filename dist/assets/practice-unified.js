@@ -492,6 +492,16 @@ function checkPunishment(fromEnter){
  nextPunishmentAttempt();note('');
 }
 
+// Highlight the correct answer words absent from the submitted response, with the same occurrence-limited scoring.
+function answerMarkup(sentence,response){
+ const ranges=typedRanges(sentence),covered=creditedIndexes(tokens(response),tokens(sentence));let end=0;
+ const html=ranges.map((r,i)=>{const before=esc(sentence.slice(end,r[0])),word=sentence.slice(...r);end=r[1];return before+(covered.has(i)?esc(word):`<span class="answer-gap" title="漏写或写错的词">${esc(word)}</span>`)}).join('');
+ return html+esc(sentence.slice(end));
+}
+function renderReference(sentence,it,visible){
+ const el=$('reference');el.hidden=!visible;el.textContent=visible?sentence:'';
+ if(visible&&(it.checked||it.passed))el.innerHTML=answerMarkup(sentence,it.passed?it.text:it.checkedText);
+}
 function render(){
  const q=question();if(!q)return;
  const st=state(),it=item(st),p=parts(),whole=st.mode==='whole',done=finished(st),split=p.length>1;
@@ -502,7 +512,7 @@ function render(){
  // English stays hidden while listening; a failed check only marks the words. “答案” reveals it until the phrase is
  // passed, after which the green words themselves show the answer.
  const showReference=answerVisible;
- $('reference').hidden=!showReference;$('reference').textContent=showReference?(done?q.sentence:target(st)):'';
+ renderReference(done?q.sentence:target(st),it,showReference);
  $('cue').textContent=answerVisible?(done||whole?q.translation:PTE.phraseChinese(q,st.step)):'';
  document.querySelector('.cue-line').hidden=!answerVisible;
  const shownText=done?'':it.text;

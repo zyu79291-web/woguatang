@@ -10,7 +10,7 @@ function setup(storage={},sentence='The site is interactive.'){
  const PTE={active:q,questions:[q,other],notes:{},posLabels:{},states:{},phrasesOf:()=>[q.sentence],findQuestion:k=>[q,other].find(x=>x.questionKey===k),visible:()=>[q,other],phraseAudio:()=>null,render(){},setState(k,v){PTE.states[k]={...PTE.states[k],...v}},dailyStats:{complete(){completed++}},book:{skip:()=>false,miss(){},credit:()=>false,save(){}},noteFor:()=>null,ready:new Promise(()=>{})};
  const context={$,document,PTE,ACCESS:{selected:0,ready:new Promise(()=>{}),activity(){},feature(){},ensureStudy:async()=>true},window:{addEventListener(){}},localStorage:{getItem:k=>storage[k]??null,setItem(k,v){storage[k]=v}},tokens:s=>(s.toLowerCase().match(/[a-z0-9]+(?:'[a-z0-9]+)*/g)||[]),esc:s=>String(s),matchMedia:()=>({matches:true}),setTimeout:()=>0,clearTimeout(){},Date,console,performance:{now:()=>0},requestAnimationFrame:f=>f()};function $(id){return el(id)}
  context.window=context;context.addEventListener=()=>{};
- const hooks='window.testEngine={scoreWords,wordScore,exact,check,state,punishment,restart,nextPunishmentAttempt,toggleAnswer,render,saveProgress,toggleLoop,handleInput,playCurrent,playChosen,maybeAutoplay,openSlot,enabled:()=>punishmentEnabled};';
+ const hooks='window.testEngine={answerMarkup,scoreWords,wordScore,exact,check,state,punishment,restart,nextPunishmentAttempt,toggleAnswer,render,saveProgress,toggleLoop,handleInput,playCurrent,playChosen,maybeAutoplay,openSlot,enabled:()=>punishmentEnabled};';
  const previewSource=fs.readFileSync(require('node:path').join(__dirname,'../dist/assets/practice-preview.js'),'utf8');
  vm.runInNewContext(previewSource.slice(previewSource.indexOf('const STATE_KEY='),previewSource.indexOf('// ---------- Search')),context);
  vm.runInNewContext(source.replace(/\}\)\(\);\s*$/,hooks+'})();'),context);
@@ -260,6 +260,17 @@ function type(h,text){h.t.state().whole.fix=null;h.el('typing').value=text;h.t.h
  assert.equal(h.el('reference').hidden,true);assert.equal(h.el('cue').textContent,'','new-round answers stay hidden');
  type(h,'interactive is site the extra trials');enter(h);await tick();
  assert.equal(h.completed(),1,'answers shown after a clean successful submission do not invalidate the pass');assert.equal(h.el('cue').textContent,'中文');
+ // Answer highlighting uses bag counts, preserves original spacing/case and ignores surplus trial words.
+ const returnSentence='You should return books to the library before ending your term.';
+ h=setup({},returnSentence);h.click('punishmentToggle');await listen(h);
+ type(h,'you should return the books to the library before ending your trem abook');enter(h);await tick();
+ assert.equal(h.el('reference').hidden,false);assert(h.el('reference').innerHTML.includes('>term</span>.'));
+ assert.equal((h.el('reference').innerHTML.match(/class="answer-gap"/g)||[]).length,1,'only the uncovered correct word is highlighted');
+ assert(h.el('wordScore').innerHTML.includes('10/11'));
+ assert.equal(h.t.answerMarkup('The cat and the dog.','dog cat and the').match(/class="answer-gap"/g).length,1,'repeated answer words need their own occurrences');
+ assert.equal(h.t.answerMarkup('The cat and the dog.','dog the cat and the spare'),'The cat and the dog.','full word coverage has no highlighted gaps despite order or extra guesses');
+ assert.equal(h.t.answerMarkup('The cat sits.','the cat').includes('>sits</span>.'),true,'omitted words are highlighted too');
+ type(h,'you should return the books to the library before ending your term abook');assert.equal(h.el('reference').hidden,true,'typing still hides the colored answer');
  // Random order is persisted in the existing session backup without touching the draft or round count.
  h=setup();type(h,'my current draft');const roundsBefore=h.PTE.roundCount('q1'),playsBefore=h.plays();
  h.PTE.toggleRandomPractice();assert(h.PTE.practiceOrder.enabled);assert.equal(h.el('typing').value,'my current draft');

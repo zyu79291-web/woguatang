@@ -344,3 +344,6 @@ html.immersive-open{overflow:hidden}
 .word-score{display:flex;justify-content:center;align-items:baseline;gap:9px;margin:10px 0 4px;color:#a9a0bd;font-size:12px;font-variant-numeric:tabular-nums}
 .word-score[hidden]{display:none}.word-score strong{font-size:21px;font-weight:600;color:#d8c2f4}.word-score[data-full=true] strong{color:#79d9b5}
 .dock.immersive .word-score{margin-top:12px;font-size:13px}.dock.immersive .word-score strong{font-size:26px}
+
+/* The answer pinpoints spelling/missing-word gaps after submission, using the trial-word score. */
+.mistake-reference .answer-gap{color:#ffc779;background:#ffc77916;border-radius:4px;padding:1px 3px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
