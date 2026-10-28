@@ -6,7 +6,7 @@ let lastActivity=0;
 const duration=ms=>{const seconds=Math.floor(ms/1000);return seconds>=3600?`${Math.floor(seconds/3600)}小时${Math.floor(seconds%3600/60)}分`:`${Math.floor(seconds/60)}分${seconds%60}秒`};
 function flush(){const now=Date.now(),playing=!audio.paused&&!audio.ended&&!audio.error,deadline=playing?Infinity:lastActivity+60000;ledger.tick(now,{active:!!lastActivity&&document.visibilityState==='visible'&&document.hasFocus()&&!document.querySelector('dialog[open]:not(#bookDialog)')&&now<deadline,deadline});if(dialog.open)render()}
 function activity(){lastActivity=Date.now();flush()}
-for(const id of ['dock','list','bookDialog']){const el=document.getElementById(id);for(const event of ['pointerdown','keydown','input'])el.addEventListener(event,activity,{passive:true})}
+for(const id of ['dock','list','bookDialog','wePanel']){const el=document.getElementById(id);for(const event of ['pointerdown','keydown','input'])el.addEventListener(event,activity,{passive:true})}
 for(const event of ['play','pause','ended'])audio.addEventListener(event,flush);
 document.addEventListener('visibilitychange',flush);window.addEventListener('blur',flush);window.addEventListener('focus',flush);window.addEventListener('pagehide',flush);window.addEventListener('storage',e=>{if(e.key===KEY){ledger.refresh();if(dialog.open)render()}});
 setInterval(flush,1000);

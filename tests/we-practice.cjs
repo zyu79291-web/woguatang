@@ -1,0 +1,23 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const ctx={window:{}};vm.createContext(ctx);
+for(const f of ['we-template.js','we-practice-model.js'])vm.runInContext(fs.readFileSync('dist/assets/'+f,'utf8'),ctx);
+const M=ctx.window.WEPracticeModel,T=ctx.window.WE_TEMPLATE;
+const targets=T.map(t=>M.compile([t]));assert.equal(T.length,4);assert.equal(M.normalize('about .  Some'), 'about. Some');
+assert.equal(targets[0].text,'In recent years, there is growing concern about. Some individuals believe that, while others hold the view that. As far as I am concerned, I am convinced that.');
+assert.equal(targets[0].prompts.length,4);
+assert.equal(targets[0].text.slice(targets[0].prompts[0].at,targets[0].prompts[0].at+1),'.');
+assert.equal(M.compile(T).text,targets.map(c=>c.text).join(' '));assert(!/[\u4e00-\u9fff]/.test(M.compile(T).text));
+const state={units:{intro:M.blank(),body1:M.blank()},history:[]},d=state.units.intro;
+M.edit(d,'Xn','In recent');assert.equal(d.strokes,2);assert.equal(d.correctStrokes,1);
+M.edit(d,'In','In recent');assert.equal(d.strokes,3);assert.equal(d.correctStrokes,2);assert.equal(M.metrics(d,'In recent').accuracy,67);
+let last=1000;last=M.tick(d,last,2000,true,10000);assert.equal(d.elapsedMs,1000);
+last=M.tick(d,last,9000,true,10000);assert.equal(d.elapsedMs,1000,'sleep gap not counted');
+last=M.tick(d,last,10000,false,10000);assert.equal(d.elapsedMs,1000,'blur not counted');
+last=M.tick(d,last,11000,true,10500);assert.equal(d.elapsedMs,1500,'idle cutoff respected');
+M.edit(d,targets[0].text,targets[0].text);assert(M.finish(state,'intro',targets[0].text,123));assert(!M.finish(state,'intro',targets[0].text,124));assert.equal(state.history.length,1);
+assert.equal(state.units.body1.text,'');const restored=JSON.parse(JSON.stringify(state));assert.equal(restored.units.intro.text,targets[0].text);assert.equal(restored.units.intro.elapsedMs,1500);assert.equal(restored.history.length,1);
+// UI storage uses the existing WFD session object, never replaces WFD item/state keys.
+const engine=fs.readFileSync('dist/assets/practice-unified.js','utf8');assert(engine.includes('wePractice:PTE.wePracticeState||resumedSession.wePractice'));
+assert(engine.includes("PTE.practiceView==='we'||dockHidden()"));
+const html=fs.readFileSync('dist/index.html','utf8');assert(html.includes('id="wfdPanel"'));assert(html.includes('id="wePanel"'));assert(html.includes('we-practice.js'));
+console.log('WE template compilation, corrected keystrokes, timer pause/idle/reload, completion deduplication, independent drafts and session integration passed.');

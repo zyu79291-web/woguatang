@@ -14,9 +14,10 @@ try{resumedSession=JSON.parse(localStorage.getItem(SESSION_KEY)||'{}');for(const
 function saveProgress(){
  try{
   const items={};for(const [key,st] of progress){const q=PTE.findQuestion(key);if(!q)continue;const elapsed={};for(const mode of ['whole','chunks'])if(st.started?.[mode])elapsed[mode]=Math.max(0,(st.ended?.[mode]||Date.now())-st.started[mode]);items[key]={sentence:q.sentence,st,elapsed}}
-  localStorage.setItem(SESSION_KEY,JSON.stringify({v:1,punishmentEnabled,practiceOrder:PTE.practiceOrder,active:PTE.active?.questionKey||resumedSession.active,items},(key,value)=>value instanceof Set?[...value]:value));
+  localStorage.setItem(SESSION_KEY,JSON.stringify({v:1,punishmentEnabled,practiceOrder:PTE.practiceOrder,wePractice:PTE.wePracticeState||resumedSession.wePractice,active:PTE.active?.questionKey||resumedSession.active,items},(key,value)=>value instanceof Set?[...value]:value));
  }catch{}
 }
+PTE.wePracticeState=resumedSession.wePractice;
 PTE.flushProgress=saveProgress;window.addEventListener('pagehide',saveProgress);
 const heard=new Set();      // questionKey:mode:step already played by clicking into the input
 let preferredMode='whole',sound=true,autoListen=true,advanceTimer=0,checkTimer=0,cheerTimer=0,composing=false;
@@ -729,7 +730,7 @@ document.querySelector('.more-menu').addEventListener('click',e=>{if(e.target.cl
 // Replay: Alt+P or Ctrl+' ; answer: Ctrl+; (same keys as 句乐部 for learners used to it) or Ctrl+Enter,
 // a backup for machines where Ctrl/Cmd+; is taken (Mac spell-check, IME or global hotkeys).
 document.addEventListener('keydown',e=>{
- if(dockHidden()||document.querySelector('dialog[open]'))return;
+ if(PTE.practiceView==='we'||dockHidden()||document.querySelector('dialog[open]'))return;
  const loopShortcut=e.altKey&&!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&(e.code==='KeyL'||e.key.toLowerCase()==='l');
  if(loopShortcut){if(e.isComposing)return;e.preventDefault();if(!e.repeat)toggleLoop();return}
  const replay=(e.altKey&&e.key.toLowerCase()==='p')||((e.ctrlKey||e.metaKey)&&(e.key==="'"||e.code==='Quote'));
