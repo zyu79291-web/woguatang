@@ -4,8 +4,10 @@ for(const file of ['sst-memory-data.js','sst-memory-model.js'])vm.runInContext(f
 const data=context.window.SST_MEMORY,create=context.window.SSTMemoryModel.create;
 assert.equal(data.questions.length,60);assert.equal(new Set(data.questions.map(q=>q.id)).size,60);
 assert.deepEqual(Array.from(data.questions,q=>q.number),Array.from({length:60},(_,i)=>i+1));
-for(const q of data.questions){assert(q.cue&&q.title&&q.titleZh&&/^\d+$/.test(q.sourceId));assert(q.points.length>=6&&q.points.length<=7);assert(q.points.every(p=>p.en&&p.zh));assert.equal(q.keywords.length,3)}
-assert.equal(data.questions.reduce((n,q)=>n+q.points.length,0),395);
+for(const q of data.questions){assert(q.cue&&q.title&&q.titleZh&&/^\d+$/.test(q.sourceId));assert.equal(q.points.length,6);assert(q.sourcePoints.length>=6&&q.sourcePoints.length<=7);assert(q.points.every(p=>p.en&&p.zh));assert.equal(q.keywords.length,3)}
+assert.equal(data.questions.reduce((n,q)=>n+q.sourcePoints.length,0),395);
+assert.equal(data.questions.reduce((n,q)=>n+q.points.length,0),360);
+for(const q of data.questions){assert.deepEqual(Array.from(q.points.flatMap(p=>p.sourcePointNumbers)),Array.from({length:q.sourcePoints.length},(_,i)=>i+1));for(const p of q.points)assert.equal(p.en,p.sourcePointNumbers.map(n=>q.sourcePoints[n-1].en).join(' '));}
 assert.equal(data.questions[0].points[0].en,'All living things are similar.');
 let model=create(data);
 model.update({draft:'All life is similar.',status:'review'});
@@ -24,4 +26,4 @@ assert.equal(model.state.filter,'remembered');assert.equal(model.wordCount('  a\
 const stale=create(data,{questionId:'unknown',stage:999,filter:'unknown',entries:{unknown:{draft:'discard'},[data.questions[0].id]:{draft:123,status:'invalid'}}});
 assert.equal(stale.question().number,1);assert.equal(stale.state.stage,1);assert.equal(stale.state.filter,'all');assert.equal(Object.keys(stale.state.entries).length,1);assert.equal(stale.record(data.questions[0].id).draft,'');
 const engine=fs.readFileSync('dist/assets/practice-unified.js','utf8');assert(engine.includes('sstPractice:PTE.sstPracticeState||resumedSession.sstPractice'));
-console.log('PASS: 60 SST questions, bilingual/ID search, independent drafts, memory filters, hidden hints on navigation, reload state and shared backup integration.');
+console.log('PASS: 60 SST questions, exactly six points each, 395 source sentences preserved, bilingual/ID search, independent drafts and reload/backup compatibility.');

@@ -122,18 +122,15 @@ button:disabled{cursor:default;opacity:.5}
  </section>
 </section>
 <section id="sstPanel" role="tabpanel" aria-labelledby="sstTab" hidden>
- <div class="sst-heading"><div><div class="sst-kicker">SUMMARIZE SPOKEN TEXT</div><h2>SST 记忆与复述</h2><p>60 题原文短句 · 逐句中英对照 · 遮住回想</p></div><span id="sstSaved" class="sst-saved" role="status">自动保存进度</span></div>
- <div class="sst-toolbar"><input id="sstSearch" type="search" aria-label="搜索 SST 题目" placeholder="搜索题号、中文、英文或关键点…" maxlength="200"><select id="sstFilter" aria-label="SST 记忆状态"><option value="all">全部题目</option><option value="review">待复习</option><option value="remembered">已记住</option></select></div>
+ <div class="sst-heading"><div><h2>SST 题目与关键点</h2><p>60 道题 · 每题 6 个关键点</p></div><span id="sstSaved" class="sst-saved" role="status">自动保存笔记</span></div>
+ <div class="sst-toolbar"><input id="sstSearch" type="search" aria-label="搜索 SST 题目" placeholder="搜索题号、题目或关键点…" maxlength="200"></div>
  <div class="sst-layout"><details id="sstTopics" class="sst-topics" open><summary>题目目录 <span id="sstCount" role="status">60 题</span></summary><div id="sstList" class="sst-list" aria-label="选择 SST 题目"></div></details>
- <div><article id="sstCard" class="sst-card" aria-label="SST 记忆卡">
- <div class="sst-card-heading"><div><div id="sstQuestionNumber" class="sst-kicker"></div><h3 id="sstTitle" tabindex="-1"></h3><p id="sstEnglishTitle" class="sst-english-title" lang="en"></p></div><span id="sstStatus" class="sst-status"></span></div>
- <div class="sst-audio"><div class="sst-audio-heading"><span id="sstAudioStatus">原版录音待接入</span><button id="sstLoop" type="button" aria-pressed="false" hidden>循环播放</button></div><audio id="sstAudio" controls preload="none" hidden></audio><p id="sstAudioPending">原版音频正在核对，当前可先练习中英短句。</p></div>
- <div id="sstHints" class="sst-hints" aria-live="polite"><p id="sstRecallPrompt" class="sst-recall-prompt" hidden>先听录音，试着回想这题的内容。</p><p id="sstCue" class="sst-cue"></p><ol id="sstPoints" class="sst-points" hidden></ol></div>
- <div class="sst-actions"><button type="button" id="sstPrevious">← 上一题</button><button type="button" id="sstReveal" class="sst-primary" aria-controls="sstHints" aria-expanded="true">看完整中英短句</button><button type="button" id="sstNext">下一题 →</button></div>
- <div class="sst-markers" role="group" aria-label="标记这题的记忆状态"><button type="button" id="sstReview" aria-pressed="false">还要复习</button><button type="button" id="sstRemembered" aria-pressed="false">这题记住了</button></div>
- <div class="sst-draft"><div class="sst-draft-heading"><label for="sstEditor">自己组织语言</label><span id="sstWordCount" class="sst-word-count" role="status">0 词</span></div><textarea id="sstEditor" class="sst-editor" lang="en" maxlength="20000" placeholder="看懂意思后，试着用自己的简单句写出来…" spellcheck="false" autocomplete="off"></textarea><p class="sst-tip">每次练 5 题：看懂 → 遮住 → 自己说 → 对照补漏。中文只作提示，不用逐字背。</p></div>
- </article><div id="sstNoResults" class="sst-empty" hidden>没有符合条件的题目。换个搜索词，或切回“全部题目”。</div></div></div>
- <p class="sst-source">60 题来自你提供的 SST 完整短句资料，共 395 句中英对照，供记忆与复述练习。</p>
+ <div><article id="sstCard" class="sst-card" aria-label="题目与六个关键点">
+ <div class="sst-card-heading"><div><div id="sstQuestionNumber" class="sst-kicker"></div><h3 id="sstTitle" tabindex="-1"></h3><p id="sstEnglishTitle" class="sst-english-title" lang="en"></p></div><div class="sst-navigation"><button type="button" id="sstPrevious" aria-label="SST 上一题">←</button><button type="button" id="sstNext" aria-label="SST 下一题">→</button></div></div>
+ <div class="sst-audio"><div class="sst-audio-heading"><span id="sstAudioStatus">原版录音尚未接入</span><button id="sstLoop" type="button" aria-pressed="false" hidden>循环播放</button></div><audio id="sstAudio" controls preload="none" hidden></audio></div>
+ <ol id="sstPoints" class="sst-points" aria-label="六个关键点"></ol>
+ <details class="sst-notes"><summary>我的笔记 <span id="sstWordCount" class="sst-word-count">0 词</span></summary><label for="sstEditor" class="sst-notes-label">这道题的笔记</label><textarea id="sstEditor" class="sst-editor" lang="en" maxlength="20000" placeholder="写下自己的笔记，自动保存…" spellcheck="false" autocomplete="off"></textarea></details>
+ </article><div id="sstNoResults" class="sst-empty" hidden>没有找到这道题，试试其他题号或关键词。</div></div></div>
 </section>
 </main>
 <section class="dock" id="dock" role="dialog" aria-label="WFD 听写练习" data-place="right">

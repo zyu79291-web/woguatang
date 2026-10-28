@@ -1,2 +1,1 @@
-// Only verified original recordings belong here. Never substitute synthesized audio.
-window.SST_AUDIO = {};
+window.SST_AUDIO={"sst-111009": {"url": "./assets/original-sst-111009-784171c73c.mp3", "provider": "APEUni 猩际", "sourceQuestionId": "64", "sourceTitle": "DNA&RNA", "sourcePage": "https://www.ptexj.com/practice/ssts/64", "duration": 77.352, "sha256": "784171c73c66a039bb14a419a763f1c420de1d40802d63c4cfe10b51610979ee"}};
