@@ -379,6 +379,8 @@ function annotated(word,note){
 const hasNotes=()=>!!PTE.notes[question()?.questionId];
 function drawWords(){
  const st=state(),it=item(st),done=finished(st);
+ // Before checking, render only the learner's own words: no answer-sized spaces or future slots.
+ words.classList.toggle('blind-entry',!done&&!it.passed&&!it.fix&&!it.checked);
  if(done||it.passed){
   const q=question(),offset=done?0:tokenOffset(st);
   words.classList.toggle('annotated-line',hasNotes());
@@ -402,9 +404,9 @@ function drawWords(){
  const html=actual.map((w,j)=>{
   let kind='';
   if(it.checked){const settled=j<actual.length-1||atGap||value===it.checkedText;kind=matched.has(j)?'correct':settled?'wrong':''}
-  return slot(w,kind,j===current,(expected[j]||w).length,editing&&j===current?editing.at:null);
+  return slot(w,kind,j===current,it.checked?(expected[j]||w).length:w.length,editing&&j===current?editing.at:null);
  });
- for(let i=actual.length;i<expected.length;i++)html.push(slot('',it.checked?'missing':'',i===current,expected[i].length));
+ if(it.checked)for(let i=actual.length;i<expected.length;i++)html.push(slot('','missing',i===current,expected[i].length));
  if(current>=html.length)html.push(slot('','',true,2));
  words.innerHTML=html.join('');
 }

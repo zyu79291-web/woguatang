@@ -335,3 +335,8 @@ html.immersive-open{overflow:hidden}
 .actions>.favorite-current{display:grid;place-items:center;width:31px;padding:6px;color:#a599b6}
 .actions>.favorite-current[aria-pressed="true"]{color:#e4bc76;background:#352e29}
 .actions>.favorite-current:hover{color:#ebcb91}
+
+/* Exam-style dictation: no word-count or word-length hints before checking. */
+.dock .word,.dock .word.annotated .w{border-bottom:0}
+.dock .words.blind-entry{gap:10px .62em}
+.dock .words.blind-entry .word{min-width:0!important;padding-left:0;padding-right:0}

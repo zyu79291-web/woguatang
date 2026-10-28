@@ -25,6 +25,12 @@ async function listen(h){void h.t.playCurrent();await tick();h.el('audio').onend
 function enter(h,{repeat=false}={}){h.el('typing').events.keydown({key:'Enter',code:'Enter',target:h.el('typing'),repeat,preventDefault(){}})}
 function type(h,text){h.t.state().whole.fix=null;h.el('typing').value=text;h.t.handleInput({isComposing:false})}
 (async()=>{
+ // Different answer lengths must produce identical blank and in-progress displays.
+ let blindShort=setup({},'A short sentence.'),blindLong=setup({},'This is a considerably longer sentence with many additional words.');
+ assert.equal(blindShort.el('words').innerHTML,blindLong.el('words').innerHTML,'blank view must not reveal target word count or lengths');
+ type(blindShort,'my own draft');type(blindLong,'my own draft');
+ assert.equal(blindShort.el('words').innerHTML,blindLong.el('words').innerHTML,'typed display must depend only on typed words before checking');
+ assert.equal((blindLong.el('words').innerHTML.match(/class="word/g)||[]).length,3,'no future answer slots');
  let h=setup();h.click('punishmentToggle');await listen(h);h.answer(correct);
  assert.equal(h.completed(),1,'one listen and first correct submission passes');
  h.t.check(true);assert.equal(h.completed(),1,'completion counted once');
