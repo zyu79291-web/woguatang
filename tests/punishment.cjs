@@ -51,7 +51,7 @@ function type(h,text){h.t.state().whole.fix=null;h.el('typing').value=text;h.t.h
  scored=setup({},eleven);scored.click('punishmentToggle');await listen(scored);await listen(scored);
  scored.answer('campus this on students for resources useful many offers library the guess');await tick();
  assert.equal(scored.completed(),0,'replayed round still cannot independently pass');assert.equal(scored.t.punishment().round,2);
- assert(scored.el('wordScore').innerHTML.includes('11/11'));assert(scored.el('wordScore').innerHTML.includes('上轮词分'),'automatic next round retains just-submitted score');
+ assert.equal(scored.el('wordScore').hidden,true,'a new round never reveals the previous denominator');assert.equal(scored.el('wordScore').textContent,'');assert.equal(scored.el('status').textContent,'');
  scored.click('clearRedo');await tick();assert.equal(scored.el('wordScore').hidden,true,'manual clear does not show an old score as a fresh result');
  scored=setup({},eleven);scored.click('punishmentToggle');scored.t.check(true);
  assert(scored.el('wordScore').innerHTML.includes('0/11'));assert.equal(scored.t.punishment().submissions,0,'empty Enter still consumes no challenge submission');
@@ -197,42 +197,69 @@ function type(h,text){h.t.state().whole.fix=null;h.el('typing').value=text;h.t.h
  const wildlife='The plight of wildlife has frequently been overlooked in development.';
  for(const challenge of [false,true]){
   h=setup({},wildlife);if(challenge)h.click('punishmentToggle');await listen(h);
-  h.answer('the plight of wildlife has frequdently been overlooked the development');
-  const f=h.t.state().whole.fix;assert(f);assert.equal(f.at,5);assert.equal(h.el('typing').value,'frequdently');
-  assert.equal(h.el('typing').selectionStart,0);assert.equal(h.el('typing').selectionEnd,'frequdently'.length);
-  enter(h);assert.equal(h.el('typing').selectionEnd,'frequdently'.length,'unchanged Enter reselects the first wrong word');
-  insertText(h,'f');assert.equal(h.el('typing').value,'f','first keystroke replaces the whole selected misspelling');
-  insertText(h,'requently ');assert.equal(f.slots[5],'frequently');assert.equal(f.at,8,'space skips correct words and moves to the next mistake');
-  assert.equal(h.el('typing').value,'the');assert.equal(h.el('typing').selectionStart,0);assert.equal(h.el('typing').selectionEnd,3);
-  insertText(h,'in');assert.equal(f.slots[8],'in');assert.equal(f.slots[9],'development','correct words remain intact');
-  assert.equal(h.PTE.roundCount('q1'),1,'word edits do not add rounds');assert.equal(h.plays(),1,'word edits do not replay audio');
-  if(challenge){assert.equal(h.t.punishment().round,1);assert.equal(h.completed(),0)}
+  const original='the plight of wildlife has frequdently been overlooked the development';
+  h.answer(original);
+  const f=h.t.state().whole.fix;assert(f.free);assert.equal(f.at,5);
+  assert.equal(h.el('typing').value,original,'checking never drops, reorders or replaces the full response');
+  const start=original.indexOf('frequdently');
+  assert.equal(h.el('typing').selectionStart,start);assert.equal(h.el('typing').selectionEnd,start+'frequdently'.length);
+  enter(h);assert.equal(h.el('typing').selectionStart,start,'unchanged Enter reselects the first wrong word');
+  insertText(h,'f');assert.equal(h.el('typing').value,original.replace('frequdently','f'));
+  insertText(h,'requently');assert.equal(h.el('typing').value,original.replace('frequdently','frequently'),'following letters append without clearing again');
+  h.t.openSlot(8,{select:true});insertText(h,'in');
+  assert.equal(h.el('typing').value,'the plight of wildlife has frequently been overlooked in development');
+  assert.equal(h.PTE.roundCount('q1'),1);assert.equal(h.plays(),1);
   enter(h);await tick();
-  if(challenge){assert.equal(h.t.punishment().round,2);assert.equal(h.PTE.roundCount('q1'),2);assert.equal(h.completed(),0);assert.equal(h.plays(),2)}
+  if(challenge){assert.equal(h.t.punishment().round,2);assert.equal(h.PTE.roundCount('q1'),2);assert.equal(h.completed(),0)}
   else assert.equal(h.completed(),1);
  }
- h=setup();h.click('punishmentToggle');await listen(h);h.answer('The is interactive.');
- assert.equal(h.t.state().whole.fix.at,1);assert.equal(h.el('typing').value,'','missing word opens an empty slot');
- insertText(h,'site');enter(h);await tick();assert.equal(h.t.punishment().round,2);
- // Clicking inside a marked mistake or moving in by arrow still replaces it on the first character.
+ // Missing words are appended freely; no fixed number of slots survives checking.
  for(const challenge of [false,true]){
-  h=setup({},wildlife);if(challenge)h.click('punishmentToggle');await listen(h);
-  h.answer('the plight of wildlife has frequdently been overlooked the development');
-  const f=h.t.state().whole.fix;
-  h.t.openSlot(5,{at:4});assert.equal(h.el('typing').selectionStart,4);assert.equal(h.el('typing').selectionEnd,4);
-  insertText(h,'f');assert.equal(h.el('typing').value,'f','typing at a collapsed caret replaces the entire wrong word');
-  insertText(h,'r');assert.equal(h.el('typing').value,'fr','second keystroke appends normally');
-  h.t.openSlot(5,{at:1});insertText(h,'x');assert.equal(h.el('typing').value,'fxr','editing a new partial spelling does not clear it again');
-  h.t.openSlot(8,{at:Infinity});insertText(h,'i');assert.equal(h.el('typing').value,'i','keyboard entry at the end also replaces the mistake');
-  insertText(h,'n');assert.equal(h.el('typing').value,'in');assert.equal(f.slots[9],'development');
-  assert.equal(h.PTE.roundCount('q1'),1);assert.equal(h.plays(),1);
+  h=setup();if(challenge)h.click('punishmentToggle');await listen(h);h.answer('The site');
+  assert.equal(h.el('typing').value,'The site ');assert.equal(h.el('typing').selectionStart,9);
+  insertText(h,'interactive ');insertText(h,Array.from({length:30},(_,i)=>'guess'+i).join(' '));
+  const many=h.el('typing').value;assert.equal(h.t.wordScore(many).correct,3);
+  assert.equal(h.t.state().whole.text,many);assert.equal(many.split(/\s+/).length,33,'extra guesses exceed the answer length without clipping');
+  enter(h);await tick();assert.equal(h.el('typing').value,many,'all guesses survive another submission');
+  assert(h.el('wordScore').innerHTML.includes('3/4'));
+  h.t.saveProgress();restored=setup({...h.storage});assert.equal(restored.el('typing').value,many,'refresh restores every extra word');
+  const n=h.el('typing').value.length;h.el('typing').setSelectionRange(n,n);insertText(h,' is spare words');
+  assert.equal(h.t.wordScore(h.el('typing').value).correct,4);assert.equal(h.completed(),0,'full word credit does not submit while typing');
+  assert.equal(h.el('typing').readOnly,false,'more words remain editable until Enter');
+  enter(h);await tick();
+  if(challenge){assert.equal(h.t.punishment().round,2);assert.equal(h.el('wordScore').hidden,true)}else {assert.equal(h.completed(),1);assert(h.el('wordScore').innerHTML.includes('4/4'))}
  }
- h=setup();h.click('punishmentToggle');await listen(h);h.answer('The syte is interactive.');
- h.t.openSlot(1,{at:2});h.el('typing').events.compositionstart();
- assert.equal(h.el('typing').selectionStart,0);assert.equal(h.el('typing').selectionEnd,4,'IME also selects the old mistake before composing');
- h.el('typing').value='site';h.el('typing').events.compositionend();assert.equal(h.t.state().whole.fix.slots[1],'site');
- h.t.openSlot(1,{at:1});h.el('typing').events.beforeinput({inputType:'deleteContentBackward',target:h.el('typing')});
- assert.equal(h.t.state().whole.fix.replaceOnType,null,'manual deletion remains available');
+ // A collapsed caret inside a marked mistake still replaces its whole old spelling.
+ h=setup({},wildlife);h.answer('the plight of wildlife has frequdently been overlooked the development');
+ h.t.openSlot(5,{at:4});const caret=h.el('typing').selectionStart;
+ assert.equal(caret,h.el('typing').value.indexOf('frequdently')+4);
+ insertText(h,'f');insertText(h,'r');assert(h.el('typing').value.includes('has fr been'));
+ h.t.openSlot(5,{at:1});insertText(h,'x');assert(h.el('typing').value.includes('has fxr been'),'mid-word edits of new partial text remain ordinary');
+ // Correct words are editable as well, and Space remains a normal separator.
+ h.t.openSlot(0,{select:true});insertText(h,'there');assert(h.el('typing').value.startsWith('there plight'));
+ h.el('typing').setSelectionRange(h.el('typing').value.length,h.el('typing').value.length);insertText(h,' more extra guesses');
+ assert(h.el('typing').value.endsWith('development more extra guesses'));
+ h=setup();h.answer('The syte is interactive.');h.t.openSlot(1,{at:2});h.el('typing').events.compositionstart();
+ assert.equal(h.el('typing').selectionStart,4);assert.equal(h.el('typing').selectionEnd,8,'IME selects only the old wrong word inside the full response');
+ const ime=h.el('typing');ime.value=ime.value.slice(0,ime.selectionStart)+'site'+ime.value.slice(ime.selectionEnd);ime.events.compositionend();
+ assert.equal(ime.value,'The site is interactive.');assert.equal(h.completed(),0);
+ // Legacy correction storage migrates in place, preserving audio/round exposure and all available words.
+ h=setup();h.click('punishmentToggle');await listen(h);h.answer('The syte is interactive.');h.t.saveProgress();
+ const old=JSON.parse(h.storage['woguatang-session-v1']);old.items.q1.st.whole.fix={slots:['The','syte','is','interactive','spare','words'],ok:[true,false,true,true,false,false],marked:['The','syte','is','interactive','spare','words'],at:1};
+ h.storage['woguatang-session-v1']=JSON.stringify(old);restored=setup({...h.storage});
+ assert.equal(restored.el('typing').value,'The syte is interactive spare words');assert(restored.t.state().whole.fix.free);
+ assert.equal(restored.t.punishment().round,1);assert.equal(restored.t.punishment().listens,1);
+ // Real Enter grades, reveals both answers, and preserves the selected wrong word in the full response.
+ h=setup();h.click('punishmentToggle');await listen(h);type(h,'The syte is interactive extra trials');enter(h);await tick();
+ assert.equal(h.el('reference').hidden,false);assert.equal(h.el('reference').textContent,correct);assert.equal(h.el('cue').textContent,'中文');
+ assert.equal(h.el('typing').value,'The syte is interactive extra trials');
+ assert.equal(h.el('typing').selectionStart,4);assert.equal(h.el('typing').selectionEnd,8);
+ insertText(h,'site');assert.equal(h.el('reference').hidden,true);assert.equal(h.el('cue').textContent,'');
+ assert.equal(h.el('typing').value,'The site is interactive extra trials');enter(h);await tick();
+ assert.equal(h.t.punishment().round,2);assert.equal(h.el('wordScore').hidden,true);assert.equal(h.el('status').textContent,'');
+ assert.equal(h.el('reference').hidden,true);assert.equal(h.el('cue').textContent,'','new-round answers stay hidden');
+ type(h,'interactive is site the extra trials');enter(h);await tick();
+ assert.equal(h.completed(),1,'answers shown after a clean successful submission do not invalidate the pass');assert.equal(h.el('cue').textContent,'中文');
  // Random order is persisted in the existing session backup without touching the draft or round count.
  h=setup();type(h,'my current draft');const roundsBefore=h.PTE.roundCount('q1'),playsBefore=h.plays();
  h.PTE.toggleRandomPractice();assert(h.PTE.practiceOrder.enabled);assert.equal(h.el('typing').value,'my current draft');
@@ -247,5 +274,5 @@ function type(h,text){h.t.state().whole.fix=null;h.el('typing').value=text;h.t.h
  assert.equal(h.el('typing').value,'my draft');assert.equal(h.PTE.roundCount('q1'),favoriteRounds);assert.equal(h.plays(),favoritePlays);
  restored=setup({...h.storage});assert(restored.PTE.isFavorite('q1'));assert.equal(restored.el('typing').value,'my draft');
  restored.click('favoriteCurrent');assert(!restored.PTE.isFavorite('q1'));
- console.log('PASS: occurrence-limited unordered trial-word scores, 6/11 and full-score feedback, persistence, challenge guards, collapsed-caret first-letter replacement, continued typing, mid-word edits, IME, selected corrections, same-round redo, round totals, existing practice rules.');
+ console.log('PASS: unlimited full-response trial words before/after checks, refresh and legacy migration, explicit submission, occurrence-limited unordered scores, 6/11 and full-score feedback, persistence, challenge guards, collapsed-caret first-letter replacement, continued typing, mid-word edits, IME, selected corrections, same-round redo, round totals, existing practice rules.');
 })().catch(e=>{console.error(e);process.exitCode=1});

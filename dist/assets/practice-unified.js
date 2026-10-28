@@ -32,6 +32,7 @@ function stateOf(q){
  if(st?.savedSentence&&st.savedSentence!==q.sentence){progress.delete(q.questionKey);st=null}
  if(!st){st={mode:preferredMode,step:0,chunks:PTE.phrasesOf(q).map(blank),whole:blank(),started:{},ended:{},roundRecorded:false};progress.set(q.questionKey,st)}
  st.mode='whole';
+ for(const it of [st.whole,...st.chunks])if(it.fix&&!it.fix.free){it.text=it.fix.slots.join(' ').trim();it.fix=freeFeedback(it.text,tokens(q.sentence));it.checkedText=it.text}
  if(seedRoundHistory(q,st))PTE.saveStates?.();
  return st;
 }
@@ -53,68 +54,79 @@ function recordSubmission(value){
  renderSubmissionScore();saveProgress();
 }
 function renderSubmissionScore(){
- const st=state(),score=st.lastSubmission,el=$('wordScore');el.hidden=!score;
- if(!score){el.textContent='';return}
- const previous=score.round&&score.round!==st.punishment?.round;
- el.innerHTML=`<span>${previous?'上轮词分':'词分'}</span><strong>${score.correct}/${score.total}</strong>`;
+ const st=state(),score=st.lastSubmission,el=$('wordScore');
+ const stale=score?.round&&score.round!==st.punishment?.round;el.hidden=!score||!!stale;
+ if(!score||stale){el.textContent='';return}
+ el.innerHTML=`<span>词分</span><strong>${score.correct}/${score.total}</strong>`;
  el.dataset.full=String(score.correct===score.total);
- el.setAttribute('aria-label',`${previous?'上轮':'本次提交'}词分 ${score.correct}/${score.total}`);
+ el.setAttribute('aria-label',`本次提交词分 ${score.correct}/${score.total}`);
 }
-// After a wrong Enter the line becomes one slot per target word (it.fix): correct words stay locked where they are and
-// only wrong or missing ones are retyped. The input then holds just the word being fixed, selected so typing replaces it.
+// Correction feedback annotates the full response; it never becomes a fixed set of input slots.
 const expected=()=>tokens(target());
-const typed=(it=item())=>it.fix?it.fix.slots.join(' ').trim():input.value;
+const typed=()=>input.value;
+function creditedIndexes(exp,act){
+ const remaining=new Map();exp.forEach(w=>remaining.set(w,(remaining.get(w)||0)+1));
+ const result=new Set();act.forEach((w,i)=>{if((remaining.get(w)||0)>0){remaining.set(w,remaining.get(w)-1);result.add(i)}});return result;
+}
+function freeFeedback(value,exp){
+ const act=tokens(value),correct=creditedIndexes(exp,act);
+ return {free:true,slots:act.slice(),marked:act.slice(),markedOk:act.map((_,i)=>correct.has(i)),ok:act.map((_,i)=>correct.has(i)),at:0};
+}
+function feedbackMatches(it,value=input.value){
+ const f=it.fix,map=new Map();if(!f?.free)return map;
+ for(const [old,now] of matchedPairs(f.marked,tokens(value)))if(f.markedOk[old]!==null)map.set(now,{source:old,kind:f.markedOk[old]?'correct':'wrong'});
+ return map;
+}
+// This alignment is only for the wrong-word book, never for displaying or limiting the response.
 function alignSlots(exp,act){
  const slots=Array(exp.length).fill(''),used=new Set();
- // Keep familiar word positions when possible, then credit correctly spelled words found elsewhere.
  for(const [i,j] of matchedPairs(exp,act)){slots[i]=act[j];used.add(j)}
  exp.forEach((w,i)=>{if(slots[i])return;const j=act.findIndex((a,k)=>a===w&&!used.has(k));if(j>=0){slots[i]=act[j];used.add(j)}});
  const remaining=act.filter((_,j)=>!used.has(j));let j=0;
  for(let i=0;i<slots.length;i++)if(!slots[i])slots[i]=remaining[j++]||'';
  return slots;
 }
-
-const slotOk=(f,i,exp)=>tokens(f.slots[i]).join(' ')===exp[i];
-function editable(f,from,step){for(let i=from+step;i>=0&&i<f.slots.length;i+=step)if(!f.ok[i])return i;return -1}
 function openSlot(i,{select=false,at=null}={}){
- const f=item().fix;if(!f||i<0)return;
- f.at=i;input.value=f.slots[i];
- f.replaceOnType=!f.ok[i]&&input.value&&(!f.marked||input.value===f.marked[i])?i:null;
- const n=input.value.length,p=select?0:at==null?n:Math.min(at,n);
- input.setSelectionRange(p,select?n:p);drawWords();
+ const f=item().fix;if(!f?.free)return;
+ const ranges=typedRanges(input.value),r=ranges[i];f.at=i;
+ if(!r){toEnd();drawWords();return}
+ const pos=r[0]+(at==null?r[1]-r[0]:Math.max(0,Math.min(at,r[1]-r[0])));
+ input.setSelectionRange(select?r[0]:pos,select?r[1]:pos);drawWords();
 }
-// A collapsed mouse/arrow caret must replace the marked mistake too, not insert into it.
+function markedWordAtCaret(){
+ if(!question())return null;
+ const it=item();if(!it.fix?.free)return null;
+ const value=input.value,start=input.selectionStart??value.length,end=input.selectionEnd??start;
+ const ranges=typedRanges(value),i=ranges.findIndex(r=>start>=r[0]&&start<=r[1]&&end<=r[1]);
+ if(i<0)return null;
+ const r=ranges[i],feedback=feedbackMatches(it,value).get(i);
+ // At the end of the response, ordinary typing appends; it must never erase the last trial word.
+ if(start===end&&start===value.length)return null;
+ if(feedback?.kind!=='wrong')return null;
+ return {...feedback,range:r};
+}
 function prepareCorrectionReplacement(){
  if(!question()||input.readOnly)return;
- const f=item().fix;if(!f||f.ok[f.at])return;
- if(f.replaceOnType===undefined&&input.value===f.marked?.[f.at])f.replaceOnType=f.at;
- if(f.replaceOnType!==f.at)return;
- input.setSelectionRange(0,input.value.length);f.replaceOnType=null;
+ const marked=markedWordAtCaret();if(!marked)return;
+ input.setSelectionRange(...marked.range);item().fix.markedOk[marked.source]=null;
 }
 function correctionBeforeInput(e){
  const kind=e.inputType||'';
- if(kind.startsWith('delete')){if(question()&&item().fix)item().fix.replaceOnType=null;return}
+ if(kind.startsWith('delete')){const marked=markedWordAtCaret();if(marked)item().fix.markedOk[marked.source]=null;return}
  if(kind.startsWith('insert')&&(kind!=='insertText'||/\S/.test(e.data||'')))prepareCorrectionReplacement();
 }
-// Typing in a slot; a space finishes the word and moves on to the next word still to fix.
-function fixInput(f){
- const parts=input.value.split(/\s+/);f.slots[f.at]=parts[0];
- if(parts.length<2)return;
- let i=f.at;
- for(const w of parts.slice(1)){const next=editable(f,i,1);if(next<0)break;i=next;if(w)f.slots[i]=w}
- if(i===f.at){input.value=parts[0];toEnd();return}
- openSlot(i,parts.at(-1)?{}:{select:true});
-}
-// Both practice modes share the same word-by-word correction path.
 function selectFirstMistake(f){
- const first=f.ok.indexOf(false);
- if(first<0)return;
- focusInput();openSlot(first,{select:true});
+ const first=[...feedbackMatches(item())].find(([,feedback])=>feedback.kind==='wrong')?.[0];
+ focusInput();
+ if(first!==undefined){openSlot(first,{select:true});return}
+ // When the existing words are all credited, missing words can be appended at the end.
+ if(input.value&&!/\s$/.test(input.value)){input.value+=' ';item().text=input.value}
+ toEnd();drawWords();
 }
 function markCorrections(it,value){
- const exp=expected(),f=it.fix||{slots:alignSlots(exp,tokens(value)),at:0};
- f.ok=f.slots.map((_,i)=>slotOk(f,i,exp));f.marked=f.slots.slice();
- bookWords(it,exp,f);it.fix=f;it.text=typed(it);it.checked=true;it.checkedText=it.text;it.errors++;
+ const exp=expected(),aligned=alignSlots(exp,tokens(value));
+ bookWords(it,exp,{slots:aligned,ok:aligned.map((w,i)=>w===exp[i])});
+ const f=freeFeedback(value,exp);it.fix=f;it.text=value;it.checked=true;it.checkedText=value;it.errors++;
  return f;
 }
 // Lifetime question counts live beside practice status, so resets and weekly bank updates keep them.
@@ -194,11 +206,6 @@ function placeCaretAt(x,y){
  if(composing||input.readOnly)return;
  const value=input.value,ranges=typedRanges(value),slots=[...words.children];let hit=-1,best=Infinity;
  slots.forEach((el,i)=>{const r=el.getBoundingClientRect();if(y<r.top-8||y>r.bottom+8)return;const d=x<r.left?r.left-x:x>r.right?x-r.right:0;if(d<best){best=d;hit=i}});
- const f=item().fix;
- if(f){   // correcting: clicking a word still to fix opens it; correct words stay locked
-  if(hit>=0&&!f.ok[hit])openSlot(hit,{at:letterOffset(slots[hit],x)});else{toEnd();drawWords()}
-  return;
- }
  const pos=hit>=0&&hit<ranges.length?Math.min(ranges[hit][1],ranges[hit][0]+letterOffset(slots[hit],x)):value.length;
  input.setSelectionRange(pos,pos);drawWords();
 }
@@ -399,8 +406,7 @@ function annotated(word,note){
 const hasNotes=()=>!!PTE.notes[question()?.questionId];
 function drawWords(){
  const st=state(),it=item(st),done=finished(st);
- // Before checking, render only the learner's own words: no answer-sized spaces or future slots.
- words.classList.toggle('blind-entry',!done&&!it.passed&&!it.fix&&!it.checked);
+ words.classList.toggle('blind-entry',!done&&!it.passed);
  if(done||it.passed){
   const q=question(),offset=done?0:tokenOffset(st);
   words.classList.toggle('annotated-line',hasNotes());
@@ -409,25 +415,17 @@ function drawWords(){
   return;
  }
  words.classList.remove('annotated-line');
- if(it.fix){
-  const f=it.fix,sel=document.activeElement===input&&input.selectionStart!==input.selectionEnd,pos=input.selectionStart??input.value.length;
-  words.innerHTML=tokens(target(st)).map((e,i)=>{
-   const cur=i===f.at,text=cur?input.value:f.slots[i];
-   const kind=f.ok[i]?'correct':text===f.marked[i]?(text?'wrong':'missing'):'';
-   return slot(text,[kind,cur&&sel?'selected':''].filter(Boolean).join(' '),cur,e.length,cur&&!sel&&pos<text.length?pos:null);
-  }).join('');
-  return;
- }
- const expected=tokens(target(st)),value=input.value,actual=tokens(value),atGap=!value||/\s$/.test(value);
- const editing=caretWord(value),current=editing?editing.word:(atGap?actual.length:actual.length-1);
- const matched=it.checked?matchedIndexes(expected,actual):new Set();
- const html=actual.map((w,j)=>{
-  let kind='';
-  if(it.checked){const settled=j<actual.length-1||atGap||value===it.checkedText;kind=matched.has(j)?'correct':settled?'wrong':''}
-  return slot(w,kind,j===current,it.checked?(expected[j]||w).length:w.length,editing&&j===current?editing.at:null);
+ const value=input.value,ranges=typedRanges(value),atGap=!value||/\s$/.test(value);
+ const editing=caretWord(value),current=editing?editing.word:(atGap?ranges.length:ranges.length-1);
+ const feedback=feedbackMatches(it,value),start=input.selectionStart,end=input.selectionEnd;
+ const html=ranges.map((r,j)=>{
+  // Preserve every typed word, punctuation and casing, in the learner's own order.
+  const suffix=value.slice(r[1],ranges[j+1]?.[0]??value.length).trim();
+  const w=value.slice(...r)+suffix,selected=document.activeElement===input&&start!==end&&start<=r[0]&&end>=r[1];
+  const kind=[feedback.get(j)?.kind||'',selected?'selected':''].filter(Boolean).join(' ');
+  return slot(w,kind,j===current,w.length,editing&&j===current?editing.at:null);
  });
- if(it.checked)for(let i=actual.length;i<expected.length;i++)html.push(slot('','missing',i===current,expected[i].length));
- if(current>=html.length)html.push(slot('','',true,2));
+ if(current>=html.length)html.push(slot('','',true,0));
  words.innerHTML=html.join('');
 }
 // A round passes only on its first submission after one listen, with no answer exposure.
@@ -470,17 +468,15 @@ function renderPunishment(){
   $(id).title=on&&p.blocked?'请重新开始一轮并通关，或关闭一遍过':'';
  }
 }
-function nextPunishmentAttempt({keepScore=false}={}){
+function nextPunishmentAttempt(){
  if(!punishmentEnabled||!question())return;
- const score=keepScore?state().lastSubmission:null;
  restart({replay:true});
- if(score){state().lastSubmission=score;renderSubmissionScore();saveProgress()}
 }
 function checkPunishment(fromEnter){
  const it=item(),p=punishment(),value=typed(it);
  if(!fromEnter)return;
  if(!tokens(value).length){note('先把本轮完整写对，再按 Enter。');return}
- if(it.checked&&it.checkedText===value&&!exact(value)){
+ if(it.checked&&tokens(it.checkedText).join(' ')===tokens(value).join(' ')&&!exact(value)){
   if(it.fix)selectFirstMistake(it.fix);
   note('');return;
  }
@@ -493,7 +489,7 @@ function checkPunishment(fromEnter){
  const clean=p.listens===1&&p.submissions===1&&!p.reason&&!it.errors&&!it.revealed;
  if(clean){p.blocked=false;p.awaiting=false;pass();return}
  invalidatePunishment(it.revealed?'本轮已看答案':p.listens!==1?'本轮未只听一遍录音':'本轮不是首次提交');
- nextPunishmentAttempt({keepScore:true});note('本轮词分已满，开始新一轮独立听写。');
+ nextPunishmentAttempt();note('');
 }
 
 function render(){
@@ -509,7 +505,7 @@ function render(){
  $('reference').hidden=!showReference;$('reference').textContent=showReference?(done?q.sentence:target(st)):'';
  $('cue').textContent=answerVisible?(done||whole?q.translation:PTE.phraseChinese(q,st.step)):'';
  document.querySelector('.cue-line').hidden=!answerVisible;
- const shownText=done?'':it.fix&&!it.passed?it.fix.slots[it.fix.at]:it.text;
+ const shownText=done?'':it.text;
  if(!composing&&input.value!==shownText)input.value=shownText;
  input.readOnly=done||it.passed;
  $('lineInput').classList.toggle('is-checked',it.checked&&!it.passed);
@@ -557,6 +553,15 @@ function check(fromEnter){
  const f=markCorrections(it,value);
  render();selectFirstMistake(f);shake();
 
+}
+// Enter grades the submitted response before exposing the answer. A restarted round stays blind.
+function submitAndReveal(){
+ if(!question())return;
+ const q=question(),st=state(),hasResponse=tokens(typed()).length>0;check(true);
+ if(!hasResponse||question()!==q||state()!==st)return;
+ answerVisible=true;
+ if(!finished(st)){item(st).revealed=true;invalidatePunishment('本轮已看答案')}
+ render();input.focus({preventScroll:true});
 }
 // The book entry each target word belongs to: the word as written, a hyphenated word kept whole (re-enrollments).
 function bookUnits(text){
@@ -663,14 +668,9 @@ function handleInput(e){
  const q=question();if(!q)return;
  const st=state(),it=item(st);
  if(it.passed||finished(st)){if(!composing)input.value=finished(st)?'':it.text;return}
- if(it.fix){if(!e.isComposing&&!composing)fixInput(it.fix)}
- else if(!e.isComposing&&!composing){
-  // At the end a space moves to the next line, never adds blanks. Mid-sentence edits keep their spaces
-  // (an inserted word needs the space after it); extra spaces never change the words being checked.
-  const tidy=input.value.replace(/^\s+/,'').replace(/\s{2,}/g,' ');
-  if(tidy!==input.value&&(input.selectionStart??input.value.length)>=input.value.length){input.value=tidy;toEnd()}
- }
+ // The full response is always editable. Spaces, extra guesses and pastes are never distributed into slots.
  it.text=typed(it);
+ if(it.fix?.free)it.fix.slots=tokens(it.text);
  if(input.value.length)hideAnswerForTyping();
  if(it.text.trim())recordRound(q,st);
  saveProgress();
@@ -679,28 +679,18 @@ function handleInput(e){
  heard.add(stepKey(st));
  drawWords();
  clearTimeout(checkTimer);
- if(!punishmentEnabled&&!composing&&exact(it.text))checkTimer=setTimeout(()=>check(false),220);
+ // Submission is explicit in both modes, so reaching full word credit never blocks more trial words.
 }
 input.addEventListener('keydown',e=>{
  keySound(e);
  if(e.key.length===1&&/\S/.test(e.key)&&!e.ctrlKey&&!e.metaKey&&!e.altKey)prepareCorrectionReplacement();
- if(e.key==='Backspace'||e.key==='Delete'){if(question()&&item().fix)item().fix.replaceOnType=null}
  if(e.isComposing||e.keyCode===229)return;
  // Ctrl/Cmd+Enter is the backup answer key (handled below), not a check.
  if(e.key==='Enter'&&(e.ctrlKey||e.metaKey))return;
- if(e.key==='Enter'){e.preventDefault();clearTimeout(checkTimer);if(punishmentEnabled&&e.repeat)return;if(finished())nextQuestion();else if(item().passed)advance();else check(true);return}
- const f=item().fix,collapsed=input.selectionStart===input.selectionEnd;
- // Correcting: Backspace in an empty word goes back to the previous word still to fix.
- if(f&&!item().passed&&e.key==='Backspace'&&!input.value){const prev=editable(f,f.at,-1);if(prev>=0){e.preventDefault();openSlot(prev)}return}
- // ←/→ switch meaning groups; in whole-sentence practice they move the caret between letters instead
- // (and, while correcting, past the edge of a word to the next word still to fix).
+ if(e.key==='Enter'){e.preventDefault();clearTimeout(checkTimer);if(punishmentEnabled&&e.repeat)return;if(finished())nextQuestion();else if(item().passed)advance();else submitAndReveal();return}
+ // Native arrows, Backspace, Delete, selection and spaces edit the entire response normally.
  if((e.key==='ArrowLeft'||e.key==='ArrowRight')&&!e.shiftKey&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
-  const st=state();
-  if(st.mode==='whole'||st.chunks.length<2){
-   const left=e.key==='ArrowLeft';
-   if(f&&!item().passed&&collapsed&&input.selectionStart===(left?0:input.value.length)){const n=editable(f,f.at,left?-1:1);if(n>=0){e.preventDefault();openSlot(n,{at:left?Infinity:0})}}
-   return;
-  }
+  const st=state();if(st.mode==='whole'||st.chunks.length<2)return;
   e.preventDefault();jump(e.key==='ArrowLeft'?-1:1);return;
  }
  if(['ArrowUp','ArrowDown'].includes(e.key))e.preventDefault();
