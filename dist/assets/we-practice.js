@@ -1,7 +1,7 @@
 (()=>{
 const M=window.WEPracticeModel,sections=window.WE_TEMPLATE,$we=id=>document.getElementById(id);
 const saved=PTE.wePracticeState||{};
-const state=PTE.wePracticeState={v:1,view:saved.view==='we'?'we':'wfd',unit:sections.some(s=>s.id===saved.unit)?saved.unit:saved.unit==='all'?'all':'intro',mode:saved.mode==='memory'?'memory':'copy',units:saved.units&&typeof saved.units==='object'?saved.units:{},history:Array.isArray(saved.history)?saved.history.slice(0,100):[]};
+const state=PTE.wePracticeState={v:1,library:saved.library&&typeof saved.library==='object'?saved.library:{},view:saved.view==='we'?'we':'wfd',unit:sections.some(s=>s.id===saved.unit)?saved.unit:saved.unit==='all'?'all':'intro',mode:saved.mode==='memory'?'memory':'copy',units:saved.units&&typeof saved.units==='object'?saved.units:{},history:Array.isArray(saved.history)?saved.history.slice(0,100):[]};
 const editor=$we('weEditor'),reference=$we('weReference');let lastTick=Date.now(),lastEdit=0,visible=false,peek=false,composing=false,lastSave=0,wasImmersive=false;
 const group=()=>state.unit==='all'?sections:sections.filter(s=>s.id===state.unit);
 const compiled=()=>M.compile(group());
@@ -47,7 +47,7 @@ async function switchView(view,{focus=true}={}){
  visible=view==='we';state.view=view;PTE.practiceView=view;
  document.body.classList.toggle('practice-we',visible);$we('wePanel').hidden=!visible;$we('wfdPanel').hidden=visible;
  for(const [id,on] of [['weTab',visible],['wfdTab',!visible]]){$we(id).classList.toggle('active',on);$we(id).setAttribute('aria-selected',String(on))}
- save();if(visible){paint();if(focus)editor.focus({preventScroll:true})}else if(focus){if(wasImmersive)await PTE.setImmersive(true);PTE.onShown?.()}
+ save();if(visible){paint();if(focus){if(PTE.weLibrary?.isOpen())PTE.weLibrary.focus();else editor.focus({preventScroll:true})}}else if(focus){if(wasImmersive)await PTE.setImmersive(true);PTE.onShown?.()}
 }
 $we('weTab').addEventListener('click',()=>switchView('we'));$we('wfdTab').addEventListener('click',()=>switchView('wfd'));
 $we('weFromDock').addEventListener('click',()=>switchView('we'));
