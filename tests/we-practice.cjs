@@ -18,6 +18,6 @@ M.edit(d,targets[0].text,targets[0].text);assert(M.finish(state,'intro',targets[
 assert.equal(state.units.body1.text,'');const restored=JSON.parse(JSON.stringify(state));assert.equal(restored.units.intro.text,targets[0].text);assert.equal(restored.units.intro.elapsedMs,1500);assert.equal(restored.history.length,1);
 // UI storage uses the existing WFD session object, never replaces WFD item/state keys.
 const engine=fs.readFileSync('dist/assets/practice-unified.js','utf8');assert(engine.includes('wePractice:PTE.wePracticeState||resumedSession.wePractice'));
-assert(engine.includes("PTE.practiceView==='we'||dockHidden()"));
+assert(engine.includes("PTE.practiceView==='we'||PTE.practiceView==='sst'||dockHidden()"));
 const html=fs.readFileSync('dist/index.html','utf8');assert(html.includes('id="wfdPanel"'));assert(html.includes('id="wePanel"'));assert(html.includes('we-practice.js'));
 console.log('WE template compilation, corrected keystrokes, timer pause/idle/reload, completion deduplication, independent drafts and session integration passed.');

@@ -1,7 +1,7 @@
 (()=>{
 const M=window.WEPracticeModel,sections=window.WE_TEMPLATE,$we=id=>document.getElementById(id);
 const saved=PTE.wePracticeState||{};
-const state=PTE.wePracticeState={v:1,library:saved.library&&typeof saved.library==='object'?saved.library:{},view:saved.view==='we'?'we':'wfd',unit:sections.some(s=>s.id===saved.unit)?saved.unit:saved.unit==='all'?'all':'intro',mode:saved.mode==='memory'?'memory':'copy',units:saved.units&&typeof saved.units==='object'?saved.units:{},history:Array.isArray(saved.history)?saved.history.slice(0,100):[]};
+const state=PTE.wePracticeState={v:1,library:saved.library&&typeof saved.library==='object'?saved.library:{},view:['we','sst'].includes(saved.view)?saved.view:'wfd',unit:sections.some(s=>s.id===saved.unit)?saved.unit:saved.unit==='all'?'all':'intro',mode:saved.mode==='memory'?'memory':'copy',units:saved.units&&typeof saved.units==='object'?saved.units:{},history:Array.isArray(saved.history)?saved.history.slice(0,100):[]};
 const editor=$we('weEditor'),reference=$we('weReference');let lastTick=Date.now(),lastEdit=0,visible=false,peek=false,composing=false,lastSave=0,wasImmersive=false;
 const group=()=>state.unit==='all'?sections:sections.filter(s=>s.id===state.unit);
 const compiled=()=>M.compile(group());
@@ -39,17 +39,23 @@ function paint(){
  for(const b of document.querySelectorAll('[data-we-mode]'))b.setAttribute('aria-pressed',String(b.dataset.weMode===state.mode));
  paintReference();paintStats();paintHistory();
 }
+let viewRequest=0;
 async function switchView(view,{focus=true}={}){
+ const request=++viewRequest;
+ if(view!=='sst')PTE.sstPractice?.stop();
  tick();lastEdit=0;lastTick=Date.now();
- if(view==='we'){
-  wasImmersive=PTE.isImmersive?.()||false;if(wasImmersive)await PTE.setImmersive(false);PTE.onHide?.();
+ if(view!=='wfd'){
+  if(!['we','sst'].includes(PTE.practiceView))wasImmersive=PTE.isImmersive?.()||false;
+  if(PTE.isImmersive?.())await PTE.setImmersive(false);
+  if(request!==viewRequest)return;PTE.onHide?.();
  }
  visible=view==='we';state.view=view;PTE.practiceView=view;
- document.body.classList.toggle('practice-we',visible);$we('wePanel').hidden=!visible;$we('wfdPanel').hidden=visible;
- for(const [id,on] of [['weTab',visible],['wfdTab',!visible]]){$we(id).classList.toggle('active',on);$we(id).setAttribute('aria-selected',String(on))}
- save();if(visible){paint();if(focus){if(PTE.weLibrary?.isOpen())PTE.weLibrary.focus();else editor.focus({preventScroll:true})}}else if(focus){if(wasImmersive)await PTE.setImmersive(true);PTE.onShown?.()}
+ document.body.classList.toggle('practice-we',visible);document.body.classList.toggle('practice-sst',view==='sst');
+ for(const name of ['we','wfd','sst']){const on=view===name;$we(name+'Panel').hidden=!on;$we(name+'Tab').classList.toggle('active',on);$we(name+'Tab').setAttribute('aria-selected',String(on))}
+ save();if(visible){paint();if(focus){if(PTE.weLibrary?.isOpen())PTE.weLibrary.focus();else editor.focus({preventScroll:true})}}else if(view==='sst'){if(focus)PTE.sstPractice?.focus()}else if(focus){if(wasImmersive)await PTE.setImmersive(true);if(request===viewRequest)PTE.onShown?.()}
 }
 $we('weTab').addEventListener('click',()=>switchView('we'));$we('wfdTab').addEventListener('click',()=>switchView('wfd'));
+$we('sstTab').addEventListener('click',()=>switchView('sst'));
 $we('weFromDock').addEventListener('click',()=>switchView('we'));
 for(const b of document.querySelectorAll('[data-we-unit]'))b.addEventListener('click',()=>{tick();state.unit=b.dataset.weUnit;peek=false;lastEdit=0;lastTick=Date.now();paint();save();editor.focus({preventScroll:true})});
 for(const b of document.querySelectorAll('[data-we-mode]'))b.addEventListener('click',()=>{tick();state.mode=b.dataset.weMode;peek=false;paint();save();editor.focus({preventScroll:true})});
@@ -65,5 +71,5 @@ editor.addEventListener('input',onInput);editor.addEventListener('blur',()=>{tic
 $we('weRestart').addEventListener('click',()=>{tick();state.units[state.unit]=M.blank();lastEdit=0;peek=false;lastTick=Date.now();paint();save();editor.focus({preventScroll:true})});
 window.addEventListener('blur',()=>{tick(true);lastEdit=0;save()});document.addEventListener('visibilitychange',()=>{tick();if(document.visibilityState!=='visible')lastEdit=0;save()});window.addEventListener('pagehide',()=>{tick();save()});
 setInterval(()=>{tick();if(visible){paintStats();if(lastEdit&&Date.now()-lastSave>=5000)save()}},1000);
-paint();const linked=new URLSearchParams(location.search).has('t');void switchView(linked?'wfd':state.view,{focus:false});
+paint();const params=new URLSearchParams(location.search),linked=params.has('t');void switchView(linked?'wfd':params.get('module')==='sst'?'sst':state.view,{focus:false});
 })();

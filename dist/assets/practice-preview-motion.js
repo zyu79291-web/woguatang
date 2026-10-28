@@ -148,7 +148,7 @@ bubble.addEventListener('click',restore);
 $('expand').addEventListener('click',()=>setImmersive(!immersive));
 // Esc closes the menu first, then leaves immersive mode, then collapses the window.
 document.addEventListener('keydown',e=>{
- if(PTE.practiceView==='we'||e.key!=='Escape'||dock.hidden)return;
+ if(PTE.practiceView==='we'||PTE.practiceView==='sst'||e.key!=='Escape'||dock.hidden)return;
  const menu=document.querySelector('.practice-more[open]');
  if(menu)menu.removeAttribute('open');else if(immersive)setImmersive(false);else minimize();
 });
