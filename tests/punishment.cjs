@@ -10,7 +10,7 @@ function setup(storage={},sentence='The site is interactive.'){
  const PTE={active:q,questions:[q,other],notes:{},posLabels:{},states:{},phrasesOf:()=>[q.sentence],findQuestion:k=>[q,other].find(x=>x.questionKey===k),visible:()=>[q,other],phraseAudio:()=>null,render(){},setState(k,v){PTE.states[k]={...PTE.states[k],...v}},dailyStats:{complete(){completed++}},book:{skip:()=>false,miss(){},credit:()=>false,save(){}},noteFor:()=>null,ready:new Promise(()=>{})};
  const context={$,document,PTE,ACCESS:{selected:0,ready:new Promise(()=>{}),activity(){},feature(){},ensureStudy:async()=>true},window:{addEventListener(){}},localStorage:{getItem:k=>storage[k]??null,setItem(k,v){storage[k]=v}},tokens:s=>(s.toLowerCase().match(/[a-z0-9]+(?:'[a-z0-9]+)*/g)||[]),esc:s=>String(s),matchMedia:()=>({matches:true}),setTimeout:()=>0,clearTimeout(){},Date,console,performance:{now:()=>0},requestAnimationFrame:f=>f()};function $(id){return el(id)}
  context.window=context;context.addEventListener=()=>{};
- const hooks='window.testEngine={check,state,punishment,restart,nextPunishmentAttempt,toggleAnswer,render,saveProgress,toggleLoop,handleInput,playCurrent,playChosen,maybeAutoplay,openSlot,enabled:()=>punishmentEnabled};';
+ const hooks='window.testEngine={scoreWords,wordScore,exact,check,state,punishment,restart,nextPunishmentAttempt,toggleAnswer,render,saveProgress,toggleLoop,handleInput,playCurrent,playChosen,maybeAutoplay,openSlot,enabled:()=>punishmentEnabled};';
  const previewSource=fs.readFileSync(require('node:path').join(__dirname,'../dist/assets/practice-preview.js'),'utf8');
  vm.runInNewContext(previewSource.slice(previewSource.indexOf('const STATE_KEY='),previewSource.indexOf('// ---------- Search')),context);
  vm.runInNewContext(source.replace(/\}\)\(\);\s*$/,hooks+'})();'),context);
@@ -31,6 +31,31 @@ function type(h,text){h.t.state().whole.fix=null;h.el('typing').value=text;h.t.h
  type(blindShort,'my own draft');type(blindLong,'my own draft');
  assert.equal(blindShort.el('words').innerHTML,blindLong.el('words').innerHTML,'typed display must depend only on typed words before checking');
  assert.equal((blindLong.el('words').innerHTML.match(/class="word/g)||[]).length,3,'no future answer slots');
+ // Trial-word scoring counts occurrence-limited words, independent of order and extra guesses.
+ const eleven='The library offers many useful resources for students on this campus.';
+ let scored=setup({},eleven);assert.equal(scored.el('wordScore').hidden,true,'no denominator before the first submission');
+ scored.click('punishmentToggle');await listen(scored);scored.answer('campus useful The offers students library guesses');
+ assert.equal(scored.t.state().lastSubmission.correct,6);assert.equal(scored.t.state().lastSubmission.total,11);
+ assert(scored.el('wordScore').innerHTML.includes('6/11'));assert.equal(scored.completed(),0);
+ const partial=scored.t.state().whole.fix;assert.equal(partial.ok.filter(Boolean).length,6,'out-of-order correct words stay credited in correction slots');
+ scored.t.saveProgress();let scoreRestore=setup({...scored.storage},eleven);assert.equal(scoreRestore.t.state().lastSubmission.correct,6);assert(scoreRestore.el('wordScore').innerHTML.includes('6/11'));
+ scored=setup({},eleven);scored.click('punishmentToggle');await listen(scored);
+ scored.answer('campus this on students for resources useful many offers library the extra guesses');
+ assert.equal(scored.completed(),1,'first full word score passes despite order and surplus guesses');assert(scored.el('wordScore').innerHTML.includes('11/11'));
+ scored=setup({},'The course and the test are useful.');
+ let count=scored.t.wordScore('course and the test are useful');assert.equal(count.correct,6);assert.equal(count.total,7,'repeated target word needs two occurrences');
+ count=scored.t.wordScore('the the the the');assert.equal(count.correct,2,'repeating a guessed word never earns more than its target count');
+ assert.equal(scored.t.wordScore('the course and the tests are useful').correct,6,'spelling and singular/plural remain distinct');
+ scored=setup({},'This course has useful materials.');scored.click('punishmentToggle');await listen(scored);
+ scored.answer('materials useful has courses course this');assert.equal(scored.completed(),1,'both candidate spellings may be tried together');
+ scored=setup({},eleven);scored.click('punishmentToggle');await listen(scored);await listen(scored);
+ scored.answer('campus this on students for resources useful many offers library the guess');await tick();
+ assert.equal(scored.completed(),0,'replayed round still cannot independently pass');assert.equal(scored.t.punishment().round,2);
+ assert(scored.el('wordScore').innerHTML.includes('11/11'));assert(scored.el('wordScore').innerHTML.includes('上轮词分'),'automatic next round retains just-submitted score');
+ scored.click('clearRedo');await tick();assert.equal(scored.el('wordScore').hidden,true,'manual clear does not show an old score as a fresh result');
+ scored=setup({},eleven);scored.click('punishmentToggle');scored.t.check(true);
+ assert(scored.el('wordScore').innerHTML.includes('0/11'));assert.equal(scored.t.punishment().submissions,0,'empty Enter still consumes no challenge submission');
+
  let h=setup();h.click('punishmentToggle');await listen(h);h.answer(correct);
  assert.equal(h.completed(),1,'one listen and first correct submission passes');
  h.t.check(true);assert.equal(h.completed(),1,'completion counted once');
@@ -222,5 +247,5 @@ function type(h,text){h.t.state().whole.fix=null;h.el('typing').value=text;h.t.h
  assert.equal(h.el('typing').value,'my draft');assert.equal(h.PTE.roundCount('q1'),favoriteRounds);assert.equal(h.plays(),favoritePlays);
  restored=setup({...h.storage});assert(restored.PTE.isFavorite('q1'));assert.equal(restored.el('typing').value,'my draft');
  restored.click('favoriteCurrent');assert(!restored.PTE.isFavorite('q1'));
- console.log('PASS: collapsed-caret first-letter replacement, continued typing, mid-word edits, IME, selected corrections, same-round redo, round totals, existing practice rules.');
+ console.log('PASS: occurrence-limited unordered trial-word scores, 6/11 and full-score feedback, persistence, challenge guards, collapsed-caret first-letter replacement, continued typing, mid-word edits, IME, selected corrections, same-round redo, round totals, existing practice rules.');
 })().catch(e=>{console.error(e);process.exitCode=1});

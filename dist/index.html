@@ -122,13 +122,14 @@ button:disabled{cursor:default;opacity:.5}
    <button id="punishmentRetry" class="punishment-retry" type="button" title="清空输入、隐藏答案，并播放一次录音" hidden>重开一轮 <span aria-hidden="true">↵</span></button>
    <details id="punishmentHelp" class="punishment-help" hidden>
     <summary aria-label="一遍过规则" title="查看规则">?</summary>
-    <div class="punishment-rules"><strong>听一遍，独立写对。</strong><p>不看答案，首次按 Enter 提交全对即可通关。</p><p>本轮没过就继续修改，整句全对后按 Enter 开始新一轮；新一轮会隐藏答案并重播一次。</p></div>
+    <div class="punishment-rules"><strong>听一遍，独立写对。</strong><p>不看答案，首次按 Enter 提交词分满分即可通关。</p><p>词分按正确单词的次数计算，不要求顺序一致，备选词不扣练习分。</p><p>本轮没过就继续修改，词分满分后按 Enter 开始新一轮；新一轮会隐藏答案并重播一次。</p></div>
    </details>
   </div>
   <div class="hint"><span id="mode">意群 1 / 2</span><span id="practiceRounds" class="practice-rounds" title="本题已记录的累计练习轮数；清空重做、重听、修改和刷新不重复计数。">累计 0 轮</span></div>
   <div class="cheer" id="cheer" aria-live="polite" hidden=""></div>
   <div class="cue-card"><div class="mistake-reference" id="reference" lang="en" hidden="">All lectures and learning materials</div><div class="cue-line cue-off"><div class="chinese-cue" id="cue">所有的讲座和学习材料</div><span class="cue-off-note" aria-hidden="true">中文已隐藏</span><button id="cueToggle" class="cue-eye" type="button" aria-pressed="true" aria-label="显示中文提示" title="显示中文提示"><svg class="eye-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg><svg class="eye-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7c1.7 0 3.2.5 4.5 1.2M22 12s-3.6 7-10 7c-1.7 0-3.2-.5-4.5-1.2"></path><path d="m4 20 16-16"></path></svg></button></div></div>
   <div class="line-input" id="lineInput"><div class="words" id="words" aria-hidden="true"><span class="word current">&nbsp;</span></div><input class="typing" id="typing" aria-label="输入听写内容" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
+  <div id="wordScore" class="word-score" role="status" aria-live="polite" title="试词练习分：按拼写正确的单词及出现次数计分，忽略顺序，多写的词不扣练习分。" hidden></div>
   <div class="status" id="status" role="status">点一下练习区开始播放</div>
   <button class="start-gate" id="startGate" type="button" hidden=""><span aria-hidden="true">▶</span> 点击开始听写</button>
   <div class="result" id="doneBar" hidden=""><div class="result-title" id="resultTitle"></div><div class="result-stats" id="resultStats"></div><div class="result-note" id="resultNote"></div><div class="result-actions"><button id="restartDone">再练一遍</button><button id="nextDone" class="primary">下一题 →</button></div></div>

@@ -40,20 +40,40 @@ const item=(st=state())=>st.mode==='whole'?st.whole:st.chunks[st.step];
 const target=(st=state())=>st.mode==='whole'?question().sentence:parts()[st.step];
 const finished=(st=state())=>st.mode==='whole'?st.whole.passed:st.chunks.every(c=>c.passed);
 const stepKey=(st=state())=>`${question().questionKey}:${st.mode}:${st.step}`;
-const exact=text=>tokens(text).join(' ')===tokens(target()).join(' ');
+// Local trial-word practice: spelling and occurrence counts matter; order and surplus guesses do not.
+function scoreWords(exp,act){
+ const remaining=new Map();exp.forEach(w=>remaining.set(w,(remaining.get(w)||0)+1));
+ const matches=[];act.forEach((w,i)=>{if((remaining.get(w)||0)>0){remaining.set(w,remaining.get(w)-1);matches.push(i)}});
+ return {correct:matches.length,total:exp.length,extra:act.length-matches.length};
+}
+const wordScore=text=>scoreWords(tokens(target()),tokens(text));
+const exact=text=>{const score=wordScore(text);return score.total>0&&score.correct===score.total};
+function recordSubmission(value){
+ const st=state();st.lastSubmission={...wordScore(value),round:punishmentEnabled?punishment().round:null,at:Date.now()};
+ renderSubmissionScore();saveProgress();
+}
+function renderSubmissionScore(){
+ const st=state(),score=st.lastSubmission,el=$('wordScore');el.hidden=!score;
+ if(!score){el.textContent='';return}
+ const previous=score.round&&score.round!==st.punishment?.round;
+ el.innerHTML=`<span>${previous?'上轮词分':'词分'}</span><strong>${score.correct}/${score.total}</strong>`;
+ el.dataset.full=String(score.correct===score.total);
+ el.setAttribute('aria-label',`${previous?'上轮':'本次提交'}词分 ${score.correct}/${score.total}`);
+}
 // After a wrong Enter the line becomes one slot per target word (it.fix): correct words stay locked where they are and
 // only wrong or missing ones are retyped. The input then holds just the word being fixed, selected so typing replaces it.
 const expected=()=>tokens(target());
 const typed=(it=item())=>it.fix?it.fix.slots.join(' ').trim():input.value;
 function alignSlots(exp,act){
- const slots=Array(exp.length).fill('');let i0=0,j0=0;
- for(const [i,j] of [...matchedPairs(exp,act),[exp.length,act.length]]){
-  for(let k=0;k<i-i0;k++)slots[i0+k]=j0+k<j?act[j0+k]:'';   // words typed between two correct ones fill that gap in order
-  if(i<exp.length)slots[i]=act[j];
-  i0=i+1;j0=j+1;
- }
+ const slots=Array(exp.length).fill(''),used=new Set();
+ // Keep familiar word positions when possible, then credit correctly spelled words found elsewhere.
+ for(const [i,j] of matchedPairs(exp,act)){slots[i]=act[j];used.add(j)}
+ exp.forEach((w,i)=>{if(slots[i])return;const j=act.findIndex((a,k)=>a===w&&!used.has(k));if(j>=0){slots[i]=act[j];used.add(j)}});
+ const remaining=act.filter((_,j)=>!used.has(j));let j=0;
+ for(let i=0;i<slots.length;i++)if(!slots[i])slots[i]=remaining[j++]||'';
  return slots;
 }
+
 const slotOk=(f,i,exp)=>tokens(f.slots[i]).join(' ')===exp[i];
 function editable(f,from,step){for(let i=from+step;i>=0&&i<f.slots.length;i+=step)if(!f.ok[i])return i;return -1}
 function openSlot(i,{select=false,at=null}={}){
@@ -450,9 +470,11 @@ function renderPunishment(){
   $(id).title=on&&p.blocked?'请重新开始一轮并通关，或关闭一遍过':'';
  }
 }
-function nextPunishmentAttempt(){
+function nextPunishmentAttempt({keepScore=false}={}){
  if(!punishmentEnabled||!question())return;
+ const score=keepScore?state().lastSubmission:null;
  restart({replay:true});
+ if(score){state().lastSubmission=score;renderSubmissionScore();saveProgress()}
 }
 function checkPunishment(fromEnter){
  const it=item(),p=punishment(),value=typed(it);
@@ -471,7 +493,7 @@ function checkPunishment(fromEnter){
  const clean=p.listens===1&&p.submissions===1&&!p.reason&&!it.errors&&!it.revealed;
  if(clean){p.blocked=false;p.awaiting=false;pass();return}
  invalidatePunishment(it.revealed?'本轮已看答案':p.listens!==1?'本轮未只听一遍录音':'本轮不是首次提交');
- nextPunishmentAttempt();note('本轮已全部写对，开始新一轮独立听写。');
+ nextPunishmentAttempt({keepScore:true});note('本轮词分已满，开始新一轮独立听写。');
 }
 
 function render(){
@@ -491,7 +513,7 @@ function render(){
  if(!composing&&input.value!==shownText)input.value=shownText;
  input.readOnly=done||it.passed;
  $('lineInput').classList.toggle('is-checked',it.checked&&!it.passed);
- drawWords();
+ drawWords();renderSubmissionScore();
  $('show').hidden=false;$('show').setAttribute('aria-pressed',String(answerVisible));
  $('show').textContent=answerVisible?'隐藏答案':'答案';
  $('play').setAttribute('aria-label',done||whole?'重听整句':'重听整句');
@@ -524,8 +546,10 @@ function hideCheer(){clearTimeout(cheerTimer);const el=$('cheer');if(el)el.hidde
 // ---------- Flow ----------
 function check(fromEnter){
  if(!question())return;const it=item();if(it.passed||finished())return;
+ const submitted=typed(it);
+ if(fromEnter||exact(submitted))recordSubmission(submitted);
  if(punishmentEnabled){checkPunishment(fromEnter);return}
- const value=typed(it);
+ const value=submitted;
  if(tokens(value).length)ACCESS.activity(question().questionId,'answer');
  if(exact(value)){pass();return}
  if(!fromEnter||!tokens(value).length)return;
@@ -710,11 +734,11 @@ $('punishmentToggle').addEventListener('click',()=>{
  punishmentEnabled=!punishmentEnabled;clearTimers();cancelAudio();answerVisible=false;
  // A mode switch begins a new attempt, leaving learned questions and daily records intact.
  const st=state();st.whole=blank();st.roundRecorded=false;delete st.ended.whole;
- delete st.punishment;
+ delete st.punishment;delete st.lastSubmission;
  if(punishmentEnabled)st.punishment=newPunishmentRound();
  for(const key of heard)if(key.startsWith(question().questionKey+':'))heard.delete(key);
  render();focusInput();
- note(punishmentEnabled?'一遍过已开启：先听一遍，不看答案，首次按 Enter 提交全对即可通关。':'已恢复普通听写');
+ note(punishmentEnabled?'一遍过已开启：先听一遍，不看答案，首次按 Enter 提交词分满分即可通关。':'已恢复普通听写');
 });
 // Answers are revealed together; the independent Chinese hint switch is no longer used.
 $('cueToggle').hidden=true;document.querySelector('.cue-line').classList.remove('cue-off');

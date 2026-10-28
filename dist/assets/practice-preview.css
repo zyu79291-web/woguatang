@@ -340,3 +340,7 @@ html.immersive-open{overflow:hidden}
 .dock .word,.dock .word.annotated .w{border-bottom:0}
 .dock .words.blind-entry{gap:10px .62em}
 .dock .words.blind-entry .word{min-width:0!important;padding-left:0;padding-right:0}
+
+.word-score{display:flex;justify-content:center;align-items:baseline;gap:9px;margin:10px 0 4px;color:#a9a0bd;font-size:12px;font-variant-numeric:tabular-nums}
+.word-score[hidden]{display:none}.word-score strong{font-size:21px;font-weight:600;color:#d8c2f4}.word-score[data-full=true] strong{color:#79d9b5}
+.dock.immersive .word-score{margin-top:12px;font-size:13px}.dock.immersive .word-score strong{font-size:26px}
