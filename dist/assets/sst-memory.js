@@ -5,6 +5,8 @@ const state=PTE.sstPracticeState=model.state,$sst=id=>document.getElementById(id
 state.filter='all';
 const search=$sst('sstSearch'),list=$sst('sstList'),card=$sst('sstCard'),editor=$sst('sstEditor');
 const recording=$sst('sstAudio'),loop=$sst('sstLoop');let audioQuestion='';
+const audioEntries=model.questions.map(q=>window.SST_AUDIO?.[q.id]).filter(Boolean);
+$sst('sstAudioCount').textContent=`已接入 ${audioEntries.length} / ${model.questions.length} 道录音`;
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function save(){PTE.flushProgress?.();$sst('sstSaved').textContent='已自动保存'}
 function stopAudio(){recording.pause();recording.loop=false;loop.setAttribute('aria-pressed','false')}
@@ -12,8 +14,11 @@ function paintAudio(q){
  if(audioQuestion===q.id)return;stopAudio();audioQuestion=q.id;
  const source=window.SST_AUDIO?.[q.id];recording.removeAttribute('src');
  recording.hidden=loop.hidden=!source;
- $sst('sstAudioStatus').textContent=source?'原版录音':'原版录音尚未接入';
- if(source){recording.src=source.url;recording.setAttribute('aria-label',q.titleZh+'原版录音')}
+ const approximate=source?.kind==='近似音频';
+ const label=approximate?'近似音频':'原版录音';
+ $sst('sstAudioStatus').textContent=source?label:'录音暂未找到';
+ $sst('sstAudioStatus').dataset.kind=approximate?'approximate':'original';
+ if(source){recording.src=source.url;recording.setAttribute('aria-label',q.titleZh+label)}
  recording.load();
 }
 function paint(){
