@@ -1,0 +1,349 @@
+/* Floating WFD practice window. Positions come from the page layout tokens in summary-preview.html. */
+.dock{position:fixed;z-index:20;left:calc(var(--side) + var(--content-w) + var(--gap));top:var(--dock-y,var(--dock-top));width:var(--dock-w);max-height:calc(100dvh - var(--dock-y,var(--dock-top)) - 16px);display:flex;flex-direction:column;background:#151620;color:#f7f6ff;border:1px solid #363446;border-radius:18px;box-shadow:0 14px 40px #15233830;overflow:hidden;transform-origin:center}
+.dock[hidden]{display:none!important}
+.dockhead{flex-shrink:0;display:flex;justify-content:space-between;align-items:center;padding:14px 18px 10px 22px;cursor:grab;touch-action:none;user-select:none}
+.dockhead strong{font-size:14px;color:#d9d3e6;letter-spacing:.3px}
+.dock-title{display:flex;align-items:baseline;gap:10px}
+.grip{width:8px;height:13px;fill:#6f6880;align-self:center;margin-right:-2px}
+.place-row{display:flex;align-items:center;gap:4px;border-top:1px solid #3a3346;margin-top:4px;padding:6px 6px 2px;font-size:11px;color:#9a90ab}
+.place-row span{margin-right:auto}
+.more-menu .place-row button{width:26px;padding:4px 0;text-align:center;border:1px solid #3d3549;border-radius:6px}
+.more-menu .place-row button[aria-pressed=true]{background:#5b4a78;border-color:#8a72b0;color:#fff}
+@media(max-width:900px){.place-row,.grip{display:none}}.dock-count{font-size:12px;color:#8f86a0;font-variant-numeric:tabular-nums}
+.dock-tools{display:flex;gap:6px}
+#expand .icon-shrink,.dock.immersive #expand .icon-expand{display:none}.dock.immersive #expand .icon-shrink{display:block}
+.dock-min{width:32px;height:32px;padding:0;border:0;border-radius:9px;background:#262533;color:#cfc8de;display:grid;place-items:center}
+.dock-min:hover{background:#34313f}.dock-min svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.dragging{user-select:none!important;transition:none!important;cursor:grabbing}
+
+.stage{flex:1;min-height:0;overflow:auto;padding:6px 22px 14px;scrollbar-width:thin;scrollbar-color:#494451 transparent}
+.hint{display:flex;align-items:center;gap:10px;min-height:30px;color:#8f86a0;font-size:12px}
+.mode-toggle{display:inline-flex;align-items:center;gap:5px;border:1px solid #9d7bcb70;background:#aa83df22;color:#dec5ff;border-radius:999px;padding:3px 11px;font-size:12px;font-weight:600;line-height:1.5}
+.mode-toggle:before{content:'⇄';font-size:13px}.mode-toggle:hover{background:#aa83df40;border-color:#b995e9}.mode-toggle[hidden]{display:none}
+.phrase-nav{display:flex;gap:6px;margin-left:auto}.phrase-nav[hidden]{display:none}
+.phrase-nav button{display:grid;place-items:center;width:30px;height:30px;padding:0;border:1px solid #393242;border-radius:9px;background:#211d29;color:#d4c5e7}
+.phrase-nav button svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.phrase-nav button:not(:disabled):hover{background:#34283f;border-color:#9072b1}.phrase-nav button:disabled{opacity:.28;cursor:default}
+
+/* Per-phrase cheer (Perfect × 3), shown in the gap above the cue for about a second. */
+.stage{position:relative}
+.cheer{position:absolute;left:50%;top:38px;transform:translateX(-50%);z-index:2;white-space:nowrap;pointer-events:none;font:italic 800 22px/1.2 system-ui,"Segoe UI",sans-serif;letter-spacing:.5px;color:#4fd8e8;text-shadow:0 0 14px #4fd8e899}
+.cheer[hidden]{display:none}
+.cheer[data-level=Perfect]{color:#ffd65c;text-shadow:0 0 16px #ffc83d99}.cheer[data-level=Good],.cheer[data-level=Done]{color:#b9a8dc;text-shadow:0 0 12px #9d7bcb66}
+
+.cue-card{text-align:center;padding:34px 4px 6px}
+.mistake-reference{font:600 17px/1.55 ui-monospace,Consolas,monospace;color:#ece5fa;margin:0 0 6px;overflow-wrap:anywhere}
+.mistake-reference[hidden]{display:none}
+.chinese-cue{font-size:19px;font-weight:500;color:#e6deed;line-height:1.6}
+.mistake-reference:not([hidden])+.cue-line .chinese-cue{font-size:15px;color:#b9aecb}
+.cue-line{display:flex;align-items:center;justify-content:center;gap:6px}
+.cue-line .chinese-cue{min-width:0}
+.cue-eye{flex:none;width:32px;height:32px;margin:-2px 0;padding:0;border:0;border-radius:8px;background:transparent;color:#8f86a6;display:grid;place-items:center;cursor:pointer}
+.cue-eye:hover{background:#262533;color:#d4c5e7}.cue-eye:focus-visible{outline:2px solid #a78bfa;outline-offset:1px}
+.cue-eye svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.cue-eye .eye-off,.cue-line.cue-off .eye-on,.cue-line.cue-off .chinese-cue{display:none}
+.cue-line.cue-off .eye-off{display:block}
+.cue-off-note{display:none;font-size:14px;color:#8f86a6;line-height:1.6}
+.cue-line.cue-off .cue-off-note{display:inline}
+
+/* Typing happens directly on the word lines: a transparent input lies over the rendered slots. */
+.line-input{position:relative;cursor:text;margin:14px 0 6px}
+.words{display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-end;gap:10px 9px;min-height:64px;padding:8px 0;pointer-events:none}
+.word{font:21px/1.45 ui-monospace,Consolas,monospace;white-space:pre;text-align:center;padding:2px 2px 1px;border-bottom:2px solid #565365;color:#f1edf8;max-width:100%}
+.word.current{border-color:#8f78b3}
+.line-input:focus-within .word.current{border-color:#b58aff}
+.line-input:focus-within .word.current:after{content:'';display:inline-block;width:1.5px;height:1.05em;margin-left:1px;background:#c6a4f6;vertical-align:-3px;animation:line-caret 1s steps(1) infinite}
+/* Caret between letters while editing inside a word; zero net width so the letters never shift. */
+.word .caret{display:none}
+.line-input:focus-within .word .caret{display:inline-block;width:1.5px;height:1.05em;margin:0 -.75px;background:#c6a4f6;vertical-align:-3px;animation:line-caret 1s steps(1) infinite}
+.line-input:focus-within .word.caret-mid:after{content:none}
+.word.correct{color:#79d9b5;border-color:#79d9b5}
+.word.wrong{color:#ff8d99;border-color:#ff7888;text-decoration:line-through;text-decoration-thickness:1.5px}
+.word.missing{border-color:#ff788899}
+.word.selected{background:#b58aff38;border-radius:3px 3px 0 0}.line-input:focus-within .word.selected:after{content:none}
+/* Annotated (passed) words: IPA above, gloss and part of speech below, underline coloured by part of speech. */
+.words.annotated-line{gap:14px 12px;align-items:flex-start}
+.word.annotated{display:inline-flex;flex-direction:column;align-items:center;border-bottom:0;padding:0;color:#f4f1fa;--pos:#79d9b5}
+.word.annotated .ipa{font:12px/1.3 "Segoe UI","Lucida Sans Unicode",system-ui,sans-serif;color:#9d97ad;margin-bottom:2px;white-space:nowrap}
+.word.annotated .w{font-family:"Segoe UI",system-ui,sans-serif;padding:0 3px 2px;border-bottom:3px solid var(--pos);border-radius:1px;line-height:1.3}
+.word.annotated .gloss{font:13px/1.4 system-ui,"Microsoft YaHei",sans-serif;color:#e8e3f1;margin-top:5px;white-space:nowrap}
+.word.annotated .pos{font:10px/1.3 system-ui,"Microsoft YaHei",sans-serif;color:#8a849a;white-space:nowrap}
+.pos-noun{--pos:#4c8dff!important}.pos-verb{--pos:#ff6b6b!important}.pos-aux{--pos:#ff9f5a!important}.pos-adj{--pos:#b36bff!important}.pos-adv{--pos:#ffc53d!important}
+.pos-prep{--pos:#3ecf8e!important}.pos-det{--pos:#1fc5b0!important}.pos-pron{--pos:#ff7eb6!important}.pos-conj{--pos:#5ccfe6!important}.pos-num{--pos:#a3b3c7!important}.pos-part{--pos:#9a94b0!important}
+.dock.immersive .word.annotated .w{font-size:48px;border-bottom-width:4px;padding:0 4px 4px}
+.dock.immersive .word.annotated .ipa{font-size:16px;margin-bottom:4px}.dock.immersive .word.annotated .gloss{font-size:17px;margin-top:8px}.dock.immersive .word.annotated .pos{font-size:12px}
+.dock.immersive .words.annotated-line{gap:26px 22px}
+.typing{position:absolute;inset:0;width:100%;height:100%;padding:0;margin:0;border:0;background:transparent;color:transparent;caret-color:transparent;font-size:16px;outline:none;opacity:1}
+.typing::selection{background:transparent}.dock .typing:focus,.dock .typing:focus-visible{outline:none}
+@keyframes line-caret{50%{opacity:0}}
+
+.status{min-height:0;margin:6px 0 0;text-align:center;color:#bbb2d3;font-size:12px}.status:empty{display:none}
+/* Question settlement card. */
+.result{text-align:center;margin-top:12px;animation:result-in .32s cubic-bezier(.2,.8,.2,1)}.result[hidden]{display:none}
+.result-title{font:italic 800 30px/1.2 system-ui,"Segoe UI",sans-serif;color:#4fd8e8;text-shadow:0 0 18px #4fd8e899}
+.result-title[data-level=Perfect]{color:#ffd65c;text-shadow:0 0 20px #ffc83d99}.result-title[data-level=Good],.result-title[data-level=完成]{color:#c7b5ec;text-shadow:0 0 14px #9d7bcb66}
+.result-stats{margin-top:6px;color:#a79dba;font-size:12px}.result-stats b{color:#ece5fa;font-weight:600}.result-stats .sep{margin:0 8px;color:#5b5468}
+.result-note{margin:10px auto 0;max-width:34em;padding:7px 12px;border-radius:9px;background:#f54a4514;color:#ff9b96;font-size:12px;line-height:1.6;white-space:pre-line;text-align:left}.result-note:empty{display:none}
+.result-actions{display:flex;justify-content:center;gap:10px;margin-top:12px}
+.result-actions button{border:1px solid #454053;background:#252532;color:#ded8eb;border-radius:9px;padding:6px 14px;font-size:13px}
+.result-actions .primary{background:#9d68ed;border-color:#9d68ed;color:#fff}
+@keyframes result-in{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:none}}
+
+.actions{flex-shrink:0;display:flex;align-items:center;gap:8px;padding:10px 18px 14px;border-top:1px solid #2a2936}
+.actions>button{border:0;background:transparent;color:#b3a8c4;border-radius:9px;padding:7px 11px;font-size:13px;white-space:nowrap}
+.actions>button:hover:not(:disabled){background:#252331;color:#e4dcf1}
+.actions .listen{display:flex;align-items:center;gap:7px;background:#2a2340;color:#e2d2fb;font-weight:600;padding:8px 14px}
+.actions .listen span{font-size:18px;line-height:1;color:#c5a1f4}.actions .listen:disabled{opacity:.4;cursor:default}
+#show[aria-pressed=true]{background:#2a2340;color:#e2d2fb}#show[hidden]{display:none}
+.practice-more{position:relative;margin-left:auto}
+.practice-more summary{cursor:pointer;list-style:none;color:#a99bb9;font-size:20px;width:32px;text-align:center;border-radius:8px}
+.practice-more summary::-webkit-details-marker{display:none}.practice-more summary:hover{background:#252331}
+.more-menu{position:absolute;bottom:38px;right:0;background:#24202f;border:1px solid #494052;box-shadow:0 8px 26px #0005;border-radius:10px;padding:6px;width:180px;z-index:25;display:flex;flex-direction:column}
+.more-menu button{display:block;width:100%;text-align:left;border:0;background:transparent;color:#d7cde6;font-size:12px;padding:8px 11px;border-radius:7px;white-space:nowrap}
+.more-menu button:hover{background:#372c45}.prefs{border-top:1px solid #3a3346;margin-top:4px;padding-top:4px}.prefs button{color:#b9aacb}
+.dock:has(.practice-more[open]){overflow:visible}
+
+/* Collapsed state: a small keyboard bubble placed beside the reading column. */
+.practice-bubble{position:fixed;z-index:21;left:calc(var(--side) + var(--content-w) + var(--gap));top:var(--dock-top);width:48px;height:48px;padding:0;border-radius:50%;border:1px solid #61566e;background:#37333f;color:#cbcbd0;box-shadow:0 6px 18px #14141c30;display:grid;place-items:center;cursor:grab;touch-action:none;transition:background .15s,transform .15s}
+.practice-bubble[hidden]{display:none}.practice-bubble:hover{background:#433d4d;transform:scale(1.06)}.practice-bubble.dragging{transform:none}
+.practice-bubble svg{width:29px;height:25px}
+
+/* Edge snapping (wide screens): top or bottom full-width bar; the page reserves the bar's space. */
+:root{--bar-h:min(300px,46dvh)}
+.snap-preview{position:fixed;z-index:19;pointer-events:none;border:2px dashed #9d7bcb;background:#9d7bcb1f;border-radius:16px}
+.snap-preview[hidden]{display:none}
+.snap-preview[data-zone=right]{left:calc(var(--side) + var(--content-w) + var(--gap));top:var(--dock-y,var(--dock-top));width:var(--dock-w);height:340px}
+.snap-preview[data-zone=left]{left:var(--side);top:var(--dock-y,var(--dock-top));width:var(--dock-w);height:340px}
+.snap-preview[data-zone=top]{left:max(24px,calc((100vw - 1100px) / 2));right:max(24px,calc((100vw - 1100px) / 2));top:12px;height:var(--bar-h)}
+.snap-preview[data-zone=bottom]{left:max(24px,calc((100vw - 1100px) / 2));right:max(24px,calc((100vw - 1100px) / 2));bottom:12px;height:var(--bar-h)}
+@media(min-width:901px){
+ /* Collapsed: the reading column widens and re-centres, smoothly. */
+ body.dock-collapsed{--content-w:min(1100px,calc(100vw - 48px));--side:max(24px,calc((100vw - var(--content-w)) / 2))}
+ main,header{transition:margin .3s ease,width .3s ease,padding .3s ease}
+ body.dock-collapsed[data-dock-place] main{margin-left:var(--side);margin-bottom:40px}
+ body.dock-collapsed[data-dock-place=top]{padding-top:0}
+ .dock[data-place=left]:not(.immersive){left:var(--side)}
+ .dock:not(.immersive){cursor:grab}.dock:not(.immersive) :is(.line-input,.more-menu){cursor:auto}
+ body[data-dock-place=top]{padding-top:calc(var(--bar-h) + 12px)}
+ body[data-dock-place=bottom] main{margin-bottom:calc(var(--bar-h) + 40px)}
+ /* Top/bottom bar: the same stacked layout as on phones (head, centred cue and word lines, actions),
+    spanning the widened reading column; the list itself uses the full column width. */
+ body:is([data-dock-place=top],[data-dock-place=bottom]){--content-w:min(1100px,calc(100vw - 48px));--side:max(24px,calc((100vw - var(--content-w)) / 2))}
+ body:is([data-dock-place=top],[data-dock-place=bottom]):not(.dock-collapsed) .contact-fab{left:auto;right:24px}
+ .dock:is([data-place=top],[data-place=bottom]):not(.immersive){left:var(--side);width:var(--content-w);height:var(--bar-h);max-height:none}
+ .dock[data-place=top]:not(.immersive){top:12px}
+ .dock[data-place=bottom]:not(.immersive){top:auto;bottom:12px}
+ .dock:is([data-place=top],[data-place=bottom]):not(.immersive) .stage{padding:4px 22px 8px}
+ .dock:is([data-place=top],[data-place=bottom]):not(.immersive) .cue-card{padding:14px 4px 2px}
+ .dock:is([data-place=top],[data-place=bottom]):not(.immersive) .line-input{margin:10px 0 2px}
+ .dock:is([data-place=top],[data-place=bottom]):not(.immersive) .words{min-height:48px}
+ .dock:is([data-place=top],[data-place=bottom]):not(.immersive) .cheer{top:8px}
+ .dock[data-place=top]:not(.immersive) .more-menu{bottom:auto;top:38px}
+}
+
+/* Immersive mode: the same window fills the screen, 句乐部-style large lines and shortcut hints. */
+.immersive-only{display:none}
+html.immersive-open{overflow:hidden}
+.dock.immersive{inset:0!important;width:auto!important;max-height:none;border:0;border-radius:0;z-index:40;background:#111218;box-shadow:none}
+.dock.immersive #minimize{display:none}
+.dock.immersive .dockhead{cursor:default;padding:18px 28px;border-bottom:1px solid #22212c}
+.dock.immersive .dockhead strong{font-size:15px}.dock.immersive .dock-count{font-size:13px}
+.dock.immersive .stage{display:flex;flex-direction:column;justify-content:center;width:min(1000px,100%);margin:0 auto;padding:24px 32px}
+.dock.immersive .hint{font-size:13px}
+.dock.immersive .cheer{position:fixed;top:13vh;font-size:44px}
+.dock.immersive .result-title{font-size:44px}.dock.immersive .result-stats{font-size:14px;margin-top:10px}.dock.immersive .result-actions{margin-top:18px}
+.dock.immersive .cue-card{padding:56px 0 8px}
+.dock.immersive .chinese-cue{font-size:24px}.dock.immersive .mistake-reference{font-size:24px;margin-bottom:10px}
+.dock.immersive .mistake-reference:not([hidden])+.cue-line .chinese-cue{font-size:18px}
+.dock.immersive .line-input{margin:30px 0 14px}
+.dock.immersive .words{gap:22px 18px;min-height:130px}.dock.immersive .word{font-size:38px;padding:2px 4px 3px}
+.dock.immersive .status{font-size:14px}
+.dock.immersive .actions{justify-content:center;gap:12px;border-top:0;padding:10px 28px 6px}
+.dock.immersive .actions .immersive-only{display:inline-block;color:#9a90ab}
+.dock.immersive .practice-more{margin-left:0}
+.dock.immersive .shortcut-hints{display:flex;justify-content:center;flex-wrap:wrap;gap:8px 22px;padding:12px 28px 22px;color:#7f778f;font-size:12px}
+.shortcut-hints span{display:flex;align-items:center;gap:6px}
+.shortcut-hints kbd{font:11px ui-monospace,Consolas,monospace;color:#c9c1d8;background:#1f1d29;border:1px solid #3a3646;border-bottom-width:2px;border-radius:5px;padding:1px 6px}
+
+@media(max-width:900px){
+ body:has(.dock.keyboard-open) .contact-fab{visibility:hidden;pointer-events:none}
+ .dock.immersive{bottom:0!important;max-height:none}
+ .dock.immersive .stage{padding:16px 18px;justify-content:flex-start}
+ .dock.immersive .cue-card{padding:28px 0 6px}.dock.immersive .chinese-cue{font-size:20px}
+ .dock.immersive .words{min-height:80px;gap:14px 12px}.dock.immersive .word{font-size:26px}
+ .dock.immersive .shortcut-hints{display:none}
+ .dock.immersive .actions{gap:2px;padding:8px 8px calc(12px + env(safe-area-inset-bottom))}
+ .dock.immersive .actions>button{padding:7px 8px}
+}
+@media(max-width:900px){
+ .dock{left:12px;right:12px;top:auto;bottom:calc(12px + env(safe-area-inset-bottom));width:auto;max-height:46dvh;border-radius:16px}
+ .dockhead{cursor:default;padding:10px 14px 4px 18px}
+ .stage{padding:4px 16px 8px}
+ .cue-card{padding:10px 4px 2px}.chinese-cue{font-size:17px}.mistake-reference{font-size:15px}
+ .line-input{margin:8px 0 2px}.words{min-height:40px;gap:8px 7px}.word{font-size:18px}
+ .actions{padding:8px 14px 10px}
+ .practice-bubble{left:auto;top:auto;right:16px;bottom:calc(16px + env(safe-area-inset-bottom))}
+}
+@media(max-width:900px){.dock.immersive .cheer{font-size:30px;top:9vh}.dock.immersive .result-title{font-size:34px}}
+@media(prefers-reduced-motion:reduce){main,header{transition:none!important}.line-input .word.current:after,.line-input .word .caret,.result{animation:none}.practice-bubble,.row{transition:none}}
+
+/* Keyboard-visible mobile viewport: short screens scroll the content, never clip behind controls. */
+@media(max-width:900px){
+ .dock.keyboard-open{top:calc(var(--pte-vv-top,0px) + 8px)!important;bottom:auto!important;
+   height:calc(var(--pte-vv-height,100dvh) - 16px);max-height:calc(var(--pte-vv-height,100dvh) - 16px)}
+ .dock.immersive.keyboard-open{top:calc(var(--pte-vv-top,0px) + 4px)!important;bottom:auto!important;
+   height:calc(var(--pte-vv-height,100dvh) - 8px);max-height:calc(var(--pte-vv-height,100dvh) - 8px)}
+ .keyboard-open .stage{flex:1 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain;scroll-padding:6px;padding:4px 12px 6px}
+ .keyboard-open .dockhead{padding:5px 10px 3px 12px}
+ .keyboard-open .hint{min-height:26px}
+ .keyboard-open .cue-card,.dock.immersive.keyboard-open .cue-card{padding:6px 0 2px}
+ .keyboard-open .chinese-cue,.dock.immersive.keyboard-open .chinese-cue{font-size:16px;line-height:1.4}
+ .keyboard-open .line-input{margin:4px 0 2px}
+ .keyboard-open .words,.dock.immersive.keyboard-open .words{min-height:32px;gap:6px;padding:4px 0}
+ .keyboard-open .word,.dock.immersive.keyboard-open .word{font-size:17px;line-height:1.4}
+ .keyboard-open .word.annotated .w,.dock.immersive.keyboard-open .word.annotated .w{font-size:17px}
+ .keyboard-open .word.annotated .ipa,.dock.immersive.keyboard-open .word.annotated .ipa{font-size:10px}
+ .keyboard-open .word.annotated .gloss,.dock.immersive.keyboard-open .word.annotated .gloss{font-size:11px;margin-top:2px}
+ .keyboard-open .actions,.dock.immersive.keyboard-open .actions{flex:0 0 auto;padding:5px 8px 6px;min-height:42px}
+ .keyboard-open .actions>button{padding:5px 7px}
+ .keyboard-open .cheer{top:28px;font-size:18px}
+}
+
+/* Phase 1 invitation gate and non-obstructing per-code watermark. */
+.access-dialog{width:min(92vw,420px);border:1px solid #e4e0f0;border-radius:16px;padding:24px;color:#243147}
+.access-dialog::backdrop{background:rgba(30,35,50,.3)}
+.access-dialog input{display:block;width:100%;margin:10px 0;padding:10px;border:1px solid #d5d8e2;border-radius:8px}
+.access-dialog button,.header-tools #accessOpen,.header-tools #accessLogout{padding:7px 12px;border:1px solid #d5cce8;border-radius:8px;background:#faf8ff;color:#655486}
+#accessError{min-height:24px;color:#a53737;font-size:13px}
+/* Open whole-sentence practice: the locked meaning-group toggle and the free-code hint. */
+.mode-toggle.locked:before{content:'🔒';font-size:11px}
+.access-dialog .access-free{margin:10px 0 14px;font-size:13px;color:#655486;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.access-dialog #accessContact{background:#6554c0;border-color:#6554c0;color:#fff}
+.access-watermark{pointer-events:none;user-select:none;position:relative;white-space:nowrap;margin:0 8px;font-size:10px;line-height:16px;opacity:.5;color:#c5b5e5;flex-shrink:0}
+@media(max-width:900px){.header-tools{gap:4px;margin-right:46px}.header-tools #accessLogout{display:none}.header-tools #accessOpen{padding:5px 7px;font-size:11px}.access-watermark{font-size:9px;margin:0 4px}}
+/* Wrong-word book: toolbar entry with a count, a light dialog listing words, and a link on the result card. */
+.book-open{flex:none;display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border:1px solid #e1e6ee;border-radius:8px;background:#fafbfe;color:#4d5b72;white-space:nowrap}
+.book-open.has-words{border-color:#d5cce8;background:#faf8ff;color:#655486}
+.book-count{min-width:18px;padding:0 6px;border-radius:9px;background:#6554c0;color:#fff;font-size:11px;line-height:18px;text-align:center}.book-count:empty{display:none}
+.book-dialog{width:min(92vw,520px);max-height:min(82dvh,720px);border:0;border-radius:16px;padding:22px 22px 18px;color:#243147;box-shadow:0 20px 60px #1523384d;overflow-y:auto;overscroll-behavior:contain}
+.book-dialog::backdrop{background:#15233866}
+.book-dialog h2{font-size:18px;margin:0 0 6px}
+.book-intro{font-size:12px;line-height:1.6;color:#7a8698;margin:0 0 12px}
+.book-practice{padding:6px 12px;border:1px solid #6554c0;border-radius:8px;background:#6554c0;color:#fff;font-size:13px}.book-practice[hidden]{display:none}
+.book-list{list-style:none;margin:10px 0 0;padding:0}
+.book-item{padding:12px 0;border-top:1px solid #eef1f6}
+.book-word{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px}.book-word b{font-size:18px;color:#243147}
+.book-ipa{font-size:12px;color:#8a95a5}.book-gloss{font-size:13px;color:#655486}
+.book-meta{margin-top:3px;font-size:12px;color:#8a95a5}.book-meta s{color:#c0473d}
+.book-sentence{margin-top:6px;font-size:13px;line-height:1.6;color:#4d5b72}.book-sentence mark{background:#fff0c7;color:#243147;border-radius:3px;padding:0 2px}
+.book-actions{display:flex;gap:8px;margin-top:8px}
+.book-actions button{padding:4px 10px;border:1px solid #d5cce8;border-radius:7px;background:#fff;color:#655486;font-size:12px}
+.book-actions button[data-remove],.book-actions button[data-restore]{border-color:#e1e6ee;color:#7a8698}
+.book-empty{padding:18px 0 6px;color:#8994a5;font-size:13px}
+.book-done{margin-top:14px;border-top:1px solid #e9edf4;padding-top:10px}.book-done[hidden]{display:none}
+.book-done summary{cursor:pointer;font-size:13px;color:#23865d}
+.book-done .book-word b{color:#7a8698}
+.result-stats .book-link{border:0;background:none;padding:0;color:#c7b5ec;font-size:inherit;text-decoration:underline;text-underline-offset:3px}.result-stats .book-link b{color:#ece5fa}
+.book-actions button.primary{border-color:#6554c0;background:#6554c0;color:#fff}
+/* Spelling step of the review: the word is a blank in its sentence; typed right before the whole question. */
+.book-drill[hidden],#drillCard[hidden],.drill-finish[hidden],#bookListView[hidden]{display:none}
+.drill-top{display:flex;justify-content:space-between;align-items:center;margin:4px 0 14px;font-size:12px;color:#8a95a5}
+.drill-top button{border:0;background:none;padding:2px 0;color:#655486;font-size:13px}
+.drill-hint{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px;min-height:22px}.drill-hint .book-gloss{font-size:16px;font-weight:600}
+.drill-hint:empty{display:none}.drill-cn{margin:-8px 0 14px;font-size:13px;color:#8a95a5}.drill-cn:empty{display:none}
+.drill-sentence{margin:10px 0 14px;font-size:17px;line-height:2;color:#243147}
+.drill-blank{display:inline-block;height:1.3em;vertical-align:-.25em;border-bottom:2px solid #6554c0;background:#f0edff;border-radius:3px 3px 0 0}
+.drill-blank.filled{height:auto;vertical-align:baseline;padding:0 3px;color:#b5472f;background:#fdeee9;border-bottom-color:#e0806a}
+.drill-blank.filled.ok{color:#23865d;background:#e7f7ef;border-bottom-color:#5cc396}
+.drill-input{display:block;width:100%;padding:10px 12px;border:1px solid #d5d8e2;border-radius:9px;font:17px/1.4 ui-monospace,"Cascadia Mono",Consolas,monospace;color:#243147}
+.drill-input:read-only{background:#f4fbf7;border-color:#9fdcbf}
+.drill-feedback{min-height:22px;margin-top:6px;font-size:13px;color:#7a8698}.drill-feedback.ok{color:#23865d;font-weight:600}.drill-feedback.wrong{color:#b5472f}
+.drill-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.drill-actions button,.drill-finish button{padding:7px 14px;border:1px solid #d5cce8;border-radius:8px;background:#fff;color:#655486;font-size:13px}
+.drill-actions .primary,.drill-finish .primary{border-color:#6554c0;background:#6554c0;color:#fff}.drill-actions button[hidden]{display:none}
+.drill-keys{margin:12px 0 0;font-size:11px;color:#a3acb9}.drill-keys kbd{font:inherit;padding:0 4px;border:1px solid #dfe3ea;border-radius:4px;background:#fafbfc}
+.drill-finish{padding:12px 0 4px}.drill-finish p{margin:0 0 14px;font-size:15px;color:#243147}
+@media(pointer:coarse){.drill-keys{display:none}}
+@media(max-width:900px){.toolbar select{flex:1 1 0;padding-left:8px;padding-right:4px}.book-open{padding:7px 10px}.book-dialog{padding:18px 16px 14px}}
+/* Deep-link landing: large start button when the browser blocks the first sound. */
+.start-gate{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;gap:12px;width:100%;border:0;border-radius:0;background:#151620e6;color:#fff;font-size:22px;font-weight:700;cursor:pointer}.start-gate[hidden]{display:none}.start-gate span{display:grid;place-items:center;width:64px;height:64px;border-radius:50%;background:#7c5cff;font-size:26px;padding-left:4px}.start-gate:hover span{background:#8f73ff}
+
+/* Dictation: reveal Chinese and English together; repeat only the active question. */
+.cue-line[hidden],.cue-eye[hidden]{display:none!important}
+.actions{flex-wrap:wrap}
+.actions #loopAudio[aria-pressed="true"]{background:#6554c0;color:#fff}
+
+.hero-tools{display:flex;align-items:center;gap:12px}.stats-open{padding:9px 14px;border:1px solid #dcd5f1;border-radius:9px;background:#fff;color:#6554c0;white-space:nowrap;font-weight:600}.stats-open:hover{background:#f3efff}
+.stats-dialog{width:570px;max-width:calc(100vw - 28px);max-height:85dvh;overflow:auto;border:0;border-radius:18px;padding:26px;color:#243147;box-shadow:0 20px 70px #15233844}.stats-dialog::backdrop{background:#15233866}.stats-heading{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;margin-bottom:20px}.stats-heading h2{margin:0;font-size:21px}.stats-heading span{font-size:12px;color:#8994a5}.stats-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.stats-cards>div{background:#f6f3ff;border-radius:11px;padding:13px 10px}.stats-cards span{display:block;font-size:11px;color:#827396}.stats-cards strong{display:block;margin-top:5px;font-size:21px;color:#6554c0;font-variant-numeric:tabular-nums}.stats-dialog h3{font-size:15px;margin:22px 0 10px}.stats-table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}.stats-table th,.stats-table td{padding:10px 5px;text-align:left;border-bottom:1px solid #edf0f5}.stats-table thead th{font-size:11px;font-weight:500;color:#8994a5}.stats-table tbody th{font-weight:500}.stats-explain,.stats-storage{font-size:11px;line-height:1.7;margin-top:14px;color:#8994a5}.stats-storage{margin-top:8px}
+@media(max-width:600px){.hero-tools{gap:0}.stats-open{padding:8px 10px;font-size:12px}.stats-dialog{padding:22px 17px}.stats-cards strong{font-size:17px}.stats-cards>div{padding:12px 8px}.stats-table{font-size:12px}}
+
+.bank-sync-notice{border:0;background:transparent;color:#8b96a8;font-size:11px;padding:4px;max-width:180px}.bank-sync-notice:not(:disabled){color:#6554c0;cursor:pointer}.bank-sync-notice[hidden]{display:none!important}.hero-tools{flex-wrap:wrap;justify-content:flex-end}
+
+.progress-backup-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}.progress-backup-actions button,.progress-import{border:1px solid #dce0eb;border-radius:9px;background:#fff;padding:9px 12px;color:#514a76;font:inherit;font-size:13px;cursor:pointer}.progress-import{display:inline-flex;align-items:center}.progress-import input{position:absolute;opacity:0;width:1px;height:1px}.progress-import:focus-within{outline:2px solid #8172c4;outline-offset:2px}
+
+/* One-pass challenge: quiet controls, with rules available on demand. */
+.punishment-controls{display:flex;flex:0 0 auto;align-items:center;gap:10px;flex-wrap:wrap;position:relative;min-height:34px;margin:0 0 16px;padding:0 0 12px;border-bottom:1px solid #ffffff0d}
+.punishment-controls #punishmentToggle{display:inline-flex;align-items:center;gap:8px;flex:none;border:0;border-radius:6px;background:transparent;padding:5px 0;color:#aaa5b6;font-size:12px;font-weight:600;line-height:20px;white-space:nowrap}
+.punishment-controls #punishmentToggle::before{content:"";width:26px;height:15px;border-radius:20px;background:radial-gradient(circle at 7.5px 7.5px,#b2adbf 4.5px,transparent 5px),#34303f;transition:background-color .15s}
+.punishment-controls #punishmentToggle[aria-pressed="true"]{color:#ded6ed}
+.punishment-controls #punishmentToggle[aria-pressed="true"]::before{background:radial-gradient(circle at 18.5px 7.5px,#f4efff 4.5px,transparent 5px),#8270b8}
+.punishment-controls #punishmentToggle:hover{color:#f4efff}
+.punishment-controls #punishmentProgress{flex:1 1 auto;min-width:0;color:#9992a6;font-size:12px;line-height:20px;font-variant-numeric:tabular-nums}
+.punishment-controls #punishmentProgress[data-state="retry"]{color:#c2aa8d}
+.punishment-controls #punishmentProgress[data-state="passed"]{color:#9bc6ae}
+.punishment-controls #punishmentRetry{flex:none;width:auto;align-self:center;display:inline-flex;align-items:center;gap:7px;margin:0;padding:4px 9px;border:1px solid #51445f;border-radius:7px;background:#272130;color:#d3c2e7;font-size:12px;line-height:20px;white-space:nowrap}
+.punishment-controls #punishmentRetry:hover{background:#352a42;border-color:#7b6595}
+.punishment-controls #punishmentRetry span{font-size:13px;color:#a291b6}
+.punishment-help{position:relative;flex:none;margin:0;color:#8f879f;font-size:12px;line-height:1.7}
+.punishment-help summary{display:grid;place-items:center;width:24px;height:28px;list-style:none;cursor:pointer;font-size:11px;font-weight:600;border:1px solid transparent;border-radius:6px}
+.punishment-help summary::-webkit-details-marker{display:none}
+.punishment-help summary:hover,.punishment-help[open] summary{background:#272130;color:#ded6ed}
+.punishment-help summary:focus-visible{outline:2px solid #ac96d7;outline-offset:2px}
+.punishment-rules{position:absolute;z-index:8;right:0;top:34px;width:260px;max-width:calc(100vw - 56px);padding:14px 16px;background:#24202d;border:1px solid #463b54;border-radius:10px;box-shadow:0 10px 28px #0005;color:#bfb5cd;font-size:12px;font-weight:400}
+.punishment-rules strong{display:block;color:#e2d8ef;font-weight:600;margin-bottom:7px}
+.punishment-rules p{color:inherit;margin:0;line-height:1.7}
+.punishment-rules p+p{margin-top:7px}
+.punishment-controls [hidden]{display:none!important}
+@media(max-width:420px){.punishment-controls{gap:7px}.punishment-controls #punishmentProgress{font-size:11px}.punishment-controls #punishmentRetry{padding:4px 7px}.punishment-controls #punishmentRetry span{display:none}}
+
+/* Per-question round history stays subtle beside existing practice status. */
+.row .practice-state{grid-area:state;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:4px;align-self:center}
+.row .practice-state .state{align-self:auto;white-space:nowrap}
+.round-count{font-size:11px;line-height:1.5;color:#8c94a5;white-space:nowrap;font-variant-numeric:tabular-nums}
+.hint .practice-rounds{margin-left:auto;font-size:11px;color:#9990a7;white-space:nowrap;font-variant-numeric:tabular-nums}
+
+/* Stable random practice, available in the list and the immersive practice menu. */
+.toolbar{flex-wrap:wrap}
+.random-practice,.reshuffle-practice{flex:none;border:1px solid #ddd5ed;border-radius:8px;padding:8px 11px;background:#faf8fe;color:#75658b;white-space:nowrap;font-size:12px;font-weight:600}
+.random-practice[aria-pressed="true"]{background:#eee8fa;border-color:#c5b5df;color:#68518a}
+.random-practice:hover,.reshuffle-practice:hover{background:#f0eaf9}
+.reshuffle-practice{border-color:transparent;background:transparent;color:#8b7c9c;font-weight:400}
+#reshufflePractice[hidden],#reshuffleFromDock[hidden]{display:none!important}
+.more-menu #randomFromDock[aria-pressed="true"]{color:#dbc5f5;background:#392d48}
+
+@media(max-width:900px){.toolbar select{flex:1 1 125px;min-width:125px}}
+
+.practice-order-controls{display:inline-flex;align-items:center;gap:3px;flex:none}
+
+/* Question favorites: compact stars without adding another practice instruction. */
+.row .idx{display:flex;flex-direction:column;align-items:center;gap:4px}
+.question-favorite{display:grid;place-items:center;flex:none;width:25px;height:25px;padding:3px;border:0;border-radius:6px;background:transparent;color:#938a9f}
+.favorite-icon{display:block;width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.question-favorite:hover{background:#f1edf8;color:#7b658f}
+.question-favorite[aria-pressed="true"]{color:#bb8a36}
+.question-favorite[aria-pressed="true"] .favorite-icon,.favorite-current[aria-pressed="true"] .favorite-icon{fill:currentColor}
+.actions>.favorite-current{display:grid;place-items:center;width:31px;padding:6px;color:#a599b6}
+.actions>.favorite-current[aria-pressed="true"]{color:#e4bc76;background:#352e29}
+.actions>.favorite-current:hover{color:#ebcb91}
+
+/* Exam-style dictation: no word-count or word-length hints before checking. */
+.dock .word,.dock .word.annotated .w{border-bottom:0}
+.dock .words.blind-entry{gap:10px .62em}
+.dock .words.blind-entry .word{min-width:0!important;padding-left:0;padding-right:0}
+
+.word-score{display:flex;justify-content:center;align-items:baseline;gap:9px;margin:10px 0 4px;color:#a9a0bd;font-size:12px;font-variant-numeric:tabular-nums}
+.word-score[hidden]{display:none}.word-score strong{font-size:21px;font-weight:600;color:#d8c2f4}.word-score[data-full=true] strong{color:#79d9b5}
+.dock.immersive .word-score{margin-top:12px;font-size:13px}.dock.immersive .word-score strong{font-size:26px}
+
+/* The answer pinpoints spelling/missing-word gaps after submission, using the trial-word score. */
+.mistake-reference .answer-gap{color:#ffc779;background:#ffc77916;border-radius:4px;padding:1px 3px;box-decoration-break:clone;-webkit-box-decoration-break:clone}

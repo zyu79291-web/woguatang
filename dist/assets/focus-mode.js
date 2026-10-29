@@ -1,6 +1,7 @@
 // The optional Chrome bridge handles global focus; ordinary practice remains browser-only.
 (()=>{
  const button=document.getElementById('focusModeButton'),dialog=document.getElementById('focusSetupDialog');if(!button)return;
+ if(!['localhost','127.0.0.1'].includes(location.hostname)){button.hidden=true;return;}
  let enabled=false,connected=false,busy=false,sequence=0,pending=new Map();
  function render(error=''){
   button.textContent=enabled?'结束专注':'专注模式：关';button.setAttribute('aria-pressed',String(enabled));button.disabled=busy;

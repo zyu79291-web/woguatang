@@ -1,6 +1,10 @@
 # 窝瓜汤
 
-个人 PTE WFD 整句听写、SST 记忆复述与 WE 模板打字练习站。仓库设为 Private，仅供自己保存和维护。
+PTE WFD 整句听写、SST 听力与 WE 写作练习站。支持电脑和 iPad，音频随站点提供。
+
+在线使用：https://zyu79291-web.github.io/woguatang/
+
+GitHub 仓库：https://github.com/zyu79291-web/woguatang
 
 ## 功能
 
@@ -50,6 +54,8 @@ python3 tools/build_offline.py
 
 练习记录、备份、运行日志、临时媒体票据和本机安装信息不会提交到仓库。原站进度导入文件已替换为空模板，本机现有记录不受影响。需要迁移进度时，在练习站的“练习记录”里导出 JSON，并在新浏览器中导入。
 
-GitHub 私有仓库用于保存源码和网站资源；本仓库没有启用 GitHub Pages 或公开网站部署。私有仓库本身不等同于带登录保护的在线网站。
+网站由 GitHub Pages 托管，从 main 分支的 docs/ 发布。修改后先运行 `python3 tools/prepare_pages.py`，再提交并推送 main，Pages 就会自动更新。dist/ 是本机与离线版本，docs/ 是经过空进度检查的公开发布副本。公开站点不会访问本机服务，也不会上传练习记录。Mac 与 iPad 的记录分别保存在各自浏览器中；迁移时从“练习记录”导出 JSON，再到另一台设备导入。Mac 专注组件仅在本机版本提供。
 
-题库及原版音频来自 pte3000.com，素材权利归原权利人；此仓库不对第三方素材声明开源许可。
+题库自动同步由本机 Python 服务执行；更新后的题库与录音提交到 main 后，在线版随之发布。GitHub Pages 本身不执行本机同步服务。
+
+应用代码采用 [MIT License](LICENSE)。题库、作文与第三方录音不在 MIT 许可范围内，来源和说明见 [素材来源](THIRD_PARTY.md)。
