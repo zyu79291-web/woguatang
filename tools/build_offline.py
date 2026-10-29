@@ -1,4 +1,5 @@
 from pathlib import Path
+from urllib.parse import urlsplit
 import json,re,base64,zipfile,html,os
 ROOT=Path(__file__).resolve().parents[1];DIST=ROOT/'dist';OUT=Path(os.environ.get('WOGUATANG_EXPORT_DIR',str(ROOT/'exports')));OUT.mkdir(parents=True,exist_ok=True)
 
@@ -14,8 +15,8 @@ def build():
  page=re.sub(r'(<script type="application/json" id="questionData">).*?(</script>)',lambda m:m[1]+encoded+m[2],page,flags=re.S)
  page=re.sub(r'\d+ 道题均使用已保存的原站整句录音。',f"{len(data['questions'])} 道题均使用已保存的原站整句录音。",page)
  (DIST/'index.html').write_text(page);(DIST/'summary-preview-data.json').write_text(json.dumps(data,ensure_ascii=False))
- standalone=re.sub(r'<link rel="stylesheet" href="./assets/([^"]+)">',lambda m:'<style>'+(DIST/'assets'/m[1]).read_text()+'</style>',page)
- standalone=re.sub(r'<script src="./assets/([^"]+)"></script>',lambda m:'<script>'+(DIST/'assets'/m[1]).read_text().replace('</script','<\\/script')+'</script>',standalone)
+ standalone=re.sub(r'<link rel="stylesheet" href="./assets/([^"]+)">',lambda m:'<style>'+(DIST/'assets'/urlsplit(m[1]).path).read_text()+'</style>',page)
+ standalone=re.sub(r'<script src="./assets/([^"]+)"></script>',lambda m:'<script>'+(DIST/'assets'/urlsplit(m[1]).path).read_text().replace('</script','<\\/script')+'</script>',standalone)
  for url in set(manifest.values())|{entry['url'] for entry in sst_manifest.values()}:standalone=standalone.replace(url,'data:audio/mpeg;base64,'+base64.b64encode((DIST/url.removeprefix('./')).read_bytes()).decode())
  for url,mime in [('./assets/wecom-qr.png','image/png'),('./favicon.svg','image/svg+xml')]:standalone=standalone.replace(url,'data:'+mime+';base64,'+base64.b64encode((DIST/url.removeprefix('./')).read_bytes()).decode())
  target=OUT/'窝瓜汤练习站.html';target.write_text(standalone);(OUT/'本周高频题库-复刻版.html').write_text(standalone)
