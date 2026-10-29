@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import { randomBytes,createHash } from 'node:crypto';
+const base=process.env.SYNC_TEST_URL||'http://127.0.0.1:8898',id=randomBytes(32).toString('hex'),token=randomBytes(32).toString('hex'),origin='https://zyu79291-web.github.io';
+const key=await crypto.subtle.importKey('raw',randomBytes(32),'AES-GCM',false,['encrypt','decrypt']);
+const plaintext=JSON.stringify({v:1,registers:{sample:{clock:1,actor:'test',value:'private draft'}},counters:{},sets:{}}),iv=randomBytes(12),encrypted=await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:new TextEncoder().encode(id)},key,new TextEncoder().encode(plaintext));
+const payload='v1.'+iv.toString('base64url')+'.'+Buffer.from(encrypted).toString('base64url');
+async function call(method,body,auth=token,from=origin){return fetch(base+'/api/sync/'+id,{method,headers:{...(auth?{Authorization:'Bearer '+auth}:{}),Origin:from,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})})}
+assert.equal((await call('GET',null,null)).status,401);
+assert.equal((await call('GET',null,token,'https://unrelated.example')).status,401);
+assert.equal((await call('OPTIONS',null,null)).headers.get('Access-Control-Allow-Origin'),origin);
+assert.equal((await call('GET')).status,404);
+const first=await call('PUT',{revision:0,payload});assert.equal(first.status,201);assert.equal((await first.json()).revision,1);
+assert.equal((await call('GET',null,randomBytes(32).toString('hex'))).status,404);
+const got=await call('GET');assert.equal(got.headers.get('Cache-Control'),'no-store');assert.equal(got.headers.get('Access-Control-Allow-Origin'),origin);const saved=await got.json();assert.equal(saved.payload,payload);assert(!saved.payload.includes('private draft'));
+const parts=saved.payload.split('.'),decoded=await crypto.subtle.decrypt({name:'AES-GCM',iv:Buffer.from(parts[1],'base64url'),additionalData:new TextEncoder().encode(id)},key,Buffer.from(parts[2],'base64url'));assert.equal(new TextDecoder().decode(decoded),plaintext);
+const concurrent=await Promise.all([call('PUT',{revision:1,payload}),call('PUT',{revision:1,payload})]);assert.deepEqual(concurrent.map(x=>x.status).sort(),[200,409]);
+assert.equal((await call('GET')).status,200);assert.equal((await (await call('GET')).json()).revision,2);
+assert.equal((await call('PUT',{revision:2,payload:'plaintext'})).status,400);
+assert.equal((await call('PUT',{revision:2,payload:'x'.repeat(1500001)})).status,413);
+console.log('PASS: encryption roundtrip, capability isolation, CORS, no-store, stale-write rejection, atomic concurrent updates, invalid and oversized payloads.');
