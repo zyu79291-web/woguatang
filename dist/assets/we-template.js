@@ -1,7 +1,7 @@
 // Fixed English wording and variable prompts transcribed from 4.11-周-WE修改.docx.
 window.WE_TEMPLATE=[
  {id:'intro',title:'开头',note:'引出主题 · 双方观点 · 我的立场',parts:[
- 'In recent years, there is growing concern about ',{slot:'主题词'},'. Some individuals believe that ',{slot:'正观点句'},', while others hold the view that ',{slot:'反观点句'},'. As far as I am concerned, I am convinced that ',{slot:'我的主观点＋第 2 / 3 段主题关键词'},'.']},
+ 'In recent years, there has been growing concern about ',{slot:'主题词'},'. Some individuals believe that ',{slot:'正观点句'},', while others hold the view that ',{slot:'反观点句'},'. As far as I am concerned, I am convinced that ',{slot:'我的主观点＋第 2 / 3 段主题关键词'},'.']},
  {id:'body1',title:'第二段',note:'正观点 1 → 解释 → 例子 → 强调观点',parts:[
  'First of all, from my point of view, ',{slot:'正观点句 1'},'. This means that ',{slot:'解释 1'},'. For example, ',{slot:'能够解释 1 的例子 1'},'. Furthermore, ',{slot:'解释 2＋例子 2'},'. Hence, it is clear that ',{slot:'正观点 1'},'.']},
  {id:'body2',title:'第三段',note:'无让步 · 正观点 2 / 反方观点 1 → 解释 → 例子 → 强调观点',parts:[

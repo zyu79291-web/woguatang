@@ -3,7 +3,7 @@ const ctx={window:{}};vm.createContext(ctx);
 for(const f of ['we-template.js','we-practice-model.js'])vm.runInContext(fs.readFileSync('dist/assets/'+f,'utf8'),ctx);
 const M=ctx.window.WEPracticeModel,T=ctx.window.WE_TEMPLATE;
 const targets=T.map(t=>M.compile([t]));assert.equal(T.length,4);assert.equal(M.normalize('about .  Some'), 'about. Some');
-assert.equal(targets[0].text,'In recent years, there is growing concern about. Some individuals believe that, while others hold the view that. As far as I am concerned, I am convinced that.');
+assert.equal(targets[0].text,'In recent years, there has been growing concern about. Some individuals believe that, while others hold the view that. As far as I am concerned, I am convinced that.');
 assert.equal(targets[0].prompts.length,4);
 assert.equal(targets[0].text.slice(targets[0].prompts[0].at,targets[0].prompts[0].at+1),'.');
 assert.equal(M.compile(T).text,targets.map(c=>c.text).join(' '));assert(!/[\u4e00-\u9fff]/.test(M.compile(T).text));
