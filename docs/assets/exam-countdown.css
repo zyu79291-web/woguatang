@@ -3,3 +3,14 @@
 .exam-countdown-days{font-size:36px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums;color:#6554c0}
 .exam-countdown time{flex-shrink:0;color:#7a6b96;font-size:13px;white-space:nowrap}
 @media(max-width:600px){.exam-countdown{gap:8px;padding:15px 16px;align-items:flex-start;flex-direction:column}.exam-countdown-main{font-size:16px}.exam-countdown-days{font-size:32px}.exam-countdown time{font-size:12px}}
+.exam-reminder{display:inline-flex;align-items:center;width:fit-content;max-width:100%;padding:5px 11px;border:1px solid #dcd1ef;border-radius:8px;background:#f1ecfa;color:#6a50a0;font-size:13px;font-weight:650;line-height:1.5;white-space:nowrap;font-variant-numeric:tabular-nums}
+.exam-header-reminder{font-size:12px}
+.exam-dock-reminder{display:flex;align-self:stretch;justify-content:center;flex-shrink:0;max-width:none;width:auto;margin:0 18px 10px;padding:6px 12px;background:#9b7cce1c;border-color:#9b7cce40;color:#d6c0f7;font-size:13px}
+.dock.immersive .exam-dock-reminder{align-self:center;min-width:220px;margin:0 22px 12px;font-size:15px}
+.exam-bubble-reminder{position:absolute;top:calc(100% + 5px);left:50%;transform:translateX(-50%);padding:3px 8px;font-size:11px;background:#37333f;color:#e3d2ff;border-color:#61566e;pointer-events:none}
+.exam-workspace-reminder{display:flex;justify-content:center;width:100%;max-width:none;border-width:0 0 1px;border-radius:0;padding:9px 16px}
+.we-library-heading>.exam-reminder{margin-top:12px}
+.exam-card-reminder{position:sticky;top:8px;z-index:2;margin:0 0 16px;box-shadow:0 3px 10px #6554a010}
+.exam-stats-reminder{margin:0 0 16px}
+.dock.keyboard-open .exam-dock-reminder{padding:3px 8px;margin:0 12px 4px;font-size:11px}
+@media(max-width:600px){.exam-header-reminder{font-size:11px;padding:4px 8px}.exam-dock-reminder{margin:0 14px 6px;padding:4px 10px;font-size:12px}.dock.immersive .exam-dock-reminder{font-size:13px;min-width:190px;margin-bottom:6px}}
