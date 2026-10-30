@@ -82,11 +82,12 @@ body.dock-collapsed[data-dock-place=left] .contact-fab{left:max(8px,calc(var(--s
 }
 button:disabled{cursor:default;opacity:.5}
 </style>
-<link rel="stylesheet" href="./assets/practice-preview.css"><link rel="stylesheet" href="./assets/we-practice.css"><link rel="stylesheet" href="./assets/we-library.css"><link rel="stylesheet" href="./assets/sst-memory.css"></head><body data-dock-place="right">
+<link rel="stylesheet" href="./assets/practice-preview.css"><link rel="stylesheet" href="./assets/we-practice.css"><link rel="stylesheet" href="./assets/we-library.css"><link rel="stylesheet" href="./assets/sst-memory.css"><link rel="stylesheet" href="./assets/exam-countdown.css"></head><body data-dock-place="right">
 <header><div class="brand"><span>窝瓜汤</span></div><div class="header-tools"><span class="preview">个人练习版</span></div></header>
 
 
 <main>
+<aside class="exam-countdown" id="examCountdown" data-exam-date="2026-11-05" aria-label="考试倒计时"><div class="exam-countdown-main"><span id="examCountdownLabel">距离考试还有</span><strong class="exam-countdown-days" id="examCountdownDays"></strong><span id="examCountdownUnit">天</span></div><time datetime="2026-11-05">考试日期 · 2026 年 11 月 5 日</time></aside>
 <section class="hero"><div><h1>窝瓜汤</h1><p class="week" id="weekRange">10月18日 – 10月24日</p></div><div class="hero-tools"><button id="bankSyncNotice" class="bank-sync-notice" type="button" hidden></button><button id="focusModeButton" class="stats-open" type="button" aria-pressed="false">专注模式：关</button><button id="practiceStatsOpen" class="stats-open" type="button" aria-haspopup="dialog">练习记录</button><div class="date"><small>题库更新日期</small><strong id="updatedAt">2026.10.18</strong></div></div></section>
 <nav class="tabs" role="tablist" aria-label="题型"><button id="wfdTab" class="active" role="tab" aria-controls="wfdPanel" aria-selected="true">WFD 听写</button><button id="sstTab" role="tab" aria-controls="sstPanel" aria-selected="false">SST 听力</button><button id="weTab" role="tab" aria-controls="wePanel" aria-selected="false">WE 写作</button></nav>
 <section id="wfdPanel" role="tabpanel" aria-labelledby="wfdTab">
@@ -166,4 +167,4 @@ button:disabled{cursor:default;opacity:.5}
 
 
 
-</body></html>
+<script src="./assets/exam-countdown.js"></script></body></html>
