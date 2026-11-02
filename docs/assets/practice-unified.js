@@ -21,7 +21,7 @@ PTE.wePracticeState=resumedSession.wePractice;
 PTE.sstPracticeState=resumedSession.sstPractice;
 PTE.flushProgress=saveProgress;window.addEventListener('pagehide',saveProgress);
 const heard=new Set();      // questionKey:mode:step already played by clicking into the input
-let preferredMode='whole',sound=true,autoListen=true,advanceTimer=0,checkTimer=0,cheerTimer=0,composing=false;
+let preferredMode='whole',sound=false,autoListen=true,advanceTimer=0,checkTimer=0,cheerTimer=0,composing=false;
 let answerVisible=false,loopEnabled=false,punishmentEnabled=resumedSession.punishmentEnabled===true;
 let streak=0;               // consecutive phrases passed without the answer and with at most one miss
 
@@ -310,7 +310,7 @@ function context(){
 // Key sounds are recorded switch clicks (Kenney “UI Audio”, CC0) embedded below as WAV. They are decoded once,
 // shortly after load, in an offline context (no user gesture needed), so even the first key has its sound.
 function loadKeySounds(){
- if(keySoundsLoading)return;
+ if(!sound||keySoundsLoading)return;
  const Offline=window.OfflineAudioContext||window.webkitOfflineAudioContext;let ctx;
  try{ctx=Offline?new Offline(1,1,32000):audioContext}catch{ctx=audioContext}
  if(!ctx)return;keySoundsLoading=true;
